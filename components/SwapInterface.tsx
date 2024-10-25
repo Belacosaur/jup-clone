@@ -174,89 +174,110 @@ const getTokenSymbol = (address: string): string => {
   return token?.symbol || 'Unknown';
 };
 
-// Update the styles object to remove scrollbars and add percentage buttons
+// Update the styles object
 const styles = {
-  // Matrix styles
-  matrixContainer: "fixed inset-0 bg-black overflow-hidden z-0",
-  matrixCanvas: "opacity-20",
-
+  // Matrix theme colors
+  primary: "text-[#00ff00]",
+  secondary: "text-[#003300]",
+  accent: "text-[#00cc00]",
+  
   // Layout styles
-  mainContainer: "h-screen flex flex-col relative z-10 overflow-hidden",
-  header: "w-full flex justify-between items-center px-6 py-4",
+  mainContainer: "min-h-screen flex flex-col relative z-10 overflow-hidden bg-black/90",
+  header: "w-full flex justify-between items-center px-6 py-4 border-b border-[#00ff00]/20",
   headerTitle: "text-[#00ff00] font-mono text-3xl tracking-wider font-bold",
-  container: "flex-1 flex items-center justify-center gap-8",
-  swapWrapper: "w-full max-w-[420px] mx-4 p-1 bg-gradient-to-br from-gray-900/90 to-black/90 rounded-2xl shadow-2xl backdrop-blur-sm", // Reduced from 460px
-  innerContainer: "bg-gray-900/60 rounded-2xl p-4 backdrop-blur-md border border-[#00ff00]/20",
+  container: "flex-1 flex items-start justify-center gap-6 p-4 pt-[100px] min-h-screen",
+  swapWrapper: `w-[420px] 
+    bg-black/95 rounded-2xl 
+    shadow-[0_0_20px_rgba(0,255,0,0.15)] 
+    backdrop-blur-lg 
+    border border-[#00ff00]/30
+    flex flex-col`,
+  
+  innerContainer: `bg-[#0a0f0a] rounded-2xl p-4 
+    backdrop-blur-md
+    flex flex-col
+    min-h-[500px]`,
 
   // Component styles
-  swapCard: "space-y-2", // Remove padding and border as it's now in TokenSelect
-  tokenSelect: "w-full", // Simplified token select styles
-  input: "w-full bg-transparent text-white text-right text-2xl font-medium focus:outline-none",
-  exchangeRate: "text-sm text-gray-400 ml-3 mt-2",
+  swapCard: "space-y-2 relative",
+  tokenSelect: `bg-black/80 rounded-xl p-4 
+    border border-[#00ff00]/20 
+    hover:border-[#00ff00]/40 
+    transition-all duration-200`,
+  input: "w-full bg-transparent text-[#00ff00] text-right text-2xl font-mono focus:outline-none placeholder-[#00ff00]/30",
+  exchangeRate: "text-sm text-[#00ff00]/60 ml-3 mt-2 font-mono",
 
   // Settings styles
-  settingsContainer: "bg-gray-800 rounded-xl p-4 mb-4 border border-gray-700",
-  settingsGroup: "flex items-center space-x-1 bg-gray-800 rounded-lg p-1",
-  settingsButton: "flex items-center space-x-1 px-2 py-1 rounded-lg hover:bg-gray-700 transition-all duration-200 text-gray-300 hover:text-white text-sm",
+  settingsContainer: `bg-black/90 rounded-xl p-4 mb-4 
+    border border-[#00ff00]/20`,
+  settingsGroup: "flex items-center space-x-1 bg-black/50 rounded-lg p-1 border border-[#00ff00]/10",
+  settingsButton: "flex items-center space-x-1 px-3 py-1.5 rounded-lg hover:bg-[#00ff00]/10 transition-all duration-200 text-[#00ff00]/80 hover:text-[#00ff00] text-sm font-mono",
   
   // Button styles
-  button: `w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 px-4 rounded-xl 
-    font-semibold transition-all duration-200 transform hover:scale-[1.02] hover:shadow-lg 
-    active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`,
-  feeButton: `px-3 py-1.5 rounded-lg transition-all duration-200 text-sm font-medium`,
-  feeButtonActive: "bg-orange-500 text-white shadow-lg",
-  feeButtonInactive: "bg-gray-700 text-gray-300 hover:bg-gray-600",
-  walletButton: "!bg-transparent !border-[#00ff00] !text-[#00ff00] !font-mono hover:!bg-[#00ff00]/10",
+  button: `w-full bg-black text-[#00ff00] py-3 px-4 rounded-xl font-mono
+    border border-[#00ff00]/50 transition-all duration-200 
+    hover:shadow-[0_0_20px_rgba(0,255,0,0.2)] hover:border-[#00ff00]
+    active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none`,
+  
+  // Popup styles
+  popup: "absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/95 rounded-xl border border-[#00ff00]/30 shadow-[0_0_30px_rgba(0,255,0,0.1)] p-6 w-[380px] backdrop-blur-xl z-[1001]",
+  popupOverlay: "fixed inset-0 bg-black/80 backdrop-blur-sm z-[1000]",
+  
+  // Token list styles
+  tokenListContainer: "bg-black/95 border border-[#00ff00]/30 rounded-xl shadow-[0_0_30px_rgba(0,255,0,0.1)]",
+  tokenListHeader: "border-b border-[#00ff00]/20 p-4",
+  tokenListSearch: "bg-black/50 text-[#00ff00] border border-[#00ff00]/30 rounded-lg px-4 py-3 w-full font-mono focus:outline-none focus:border-[#00ff00]/60 placeholder-[#00ff00]/30",
+  tokenListItem: "px-4 py-3 hover:bg-[#00ff00]/5 transition-colors flex items-center justify-between",
+  tokenListItemActive: "bg-[#00ff00]/10",
+  
+  // Percentage buttons
+  percentageContainer: "flex justify-end space-x-2 mb-2",
+  percentageButton: "px-3 py-1.5 text-xs rounded-md bg-black/50 hover:bg-[#00ff00]/10 text-[#00ff00]/70 hover:text-[#00ff00] transition-all duration-200 border border-[#00ff00]/20 font-mono",
+  percentageButtonActive: "bg-[#00ff00]/20 text-[#00ff00] border-[#00ff00]/50",
+
+  // Loading spinner
+  spinner: "animate-spin h-5 w-5 text-[#00ff00]",
+
+  // Matrix styles
+  matrixContainer: "fixed inset-0 bg-black overflow-hidden z-0",
+  matrixCanvas: "opacity-[0.15]", // Slightly increase matrix opacity
+
+  // Fee button styles
+  feeButton: "px-3 py-1.5 rounded-lg transition-all duration-200 text-sm font-mono",
+  feeButtonActive: "bg-[#00ff00]/20 text-[#00ff00] border-[#00ff00]/50",
+  feeButtonInactive: "bg-black/50 text-[#00ff00]/70 hover:text-[#00ff00] border border-[#00ff00]/20",
 
   // Toggle styles
-  toggleContainer: "flex items-center space-x-2 mb-4 bg-gray-800 p-1 rounded-lg",
-  toggleButton: "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
-  toggleActive: "bg-gray-700 text-white shadow-sm",
-  toggleInactive: "text-gray-400 hover:text-gray-300",
-
-  // Popup styles
-  popup: "absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 rounded-xl border border-gray-700 shadow-xl p-4 w-72 z-50",
-  popupOverlay: "fixed inset-0 bg-black bg-opacity-50 z-40",
-
-  // Status styles
-  successText: "mt-2 text-green-400 text-center",
-  errorText: "mt-2 text-red-400 text-center",
-
-  // Misc styles
-  topBar: "flex items-center space-x-2 mb-4",
-  checkbox: "form-checkbox h-4 w-4 text-orange-500 rounded border-gray-600 bg-gray-700 focus:ring-orange-500",
-  checkboxLabel: "text-sm font-medium text-gray-300 select-none",
-  settingsIcon: "p-2 rounded-lg hover:bg-gray-700 transition-all duration-200",
-
-  // Social styles
-  socialsContainer: "mt-6 flex justify-center space-x-4",
-  socialLink: "opacity-70 hover:opacity-100 transition-opacity duration-200",
-
-  // Status styles
-  statusContainer: "mt-4 p-4 rounded-xl border",
-  statusSuccess: "border-green-500/20 bg-green-500/10",
-  statusError: "border-red-500/20 bg-red-500/10",
-  statusLoading: "border-[#00ff00]/20 bg-[#00ff00]/10",
-  statusText: "text-center flex items-center justify-center gap-2",
-  spinner: "animate-spin h-5 w-5",
+  toggleButton: "px-3 py-1.5 rounded-lg text-sm font-mono transition-all duration-200",
+  toggleActive: "bg-[#00ff00]/20 text-[#00ff00] border-[#00ff00]/50",
+  toggleInactive: "bg-black/50 text-[#00ff00]/70 hover:text-[#00ff00] border border-[#00ff00]/20",
 
   // Console styles
-  consoleContainer: "w-[420px] bg-black/80 border border-[#00ff00]/20 rounded-2xl p-4 font-mono text-sm h-[402px] overflow-hidden flex flex-col",
+  consoleContainer: `w-[420px] min-h-[500px] 
+    bg-black/95 
+    border border-[#00ff00]/30 
+    rounded-2xl p-4 
+    font-mono text-sm 
+    flex flex-col
+    shadow-[0_0_20px_rgba(0,255,0,0.15)]`,
   consoleHeader: "text-[#00ff00] mb-4 pb-2 font-bold border-b border-[#00ff00]/20",
-  consoleContent: "flex-1 overflow-y-auto space-y-1 scrollbar-thin scrollbar-track-black scrollbar-thumb-[#00ff00]/20",
+  consoleContent: `flex-1 overflow-y-auto space-y-1 
+    scrollbar-thin scrollbar-track-black scrollbar-thumb-[#00ff00]/20
+    max-h-[calc(100vh-200px)]`,
   consoleMessage: "flex items-start space-x-2 break-all whitespace-pre-wrap",
   consoleText: "text-[#00ff00] font-mono break-words flex-1",
   consoleCursor: "text-[#00ff00] mr-2",
   consoleFooter: "mt-4 pt-2 border-t border-[#00ff00]/20 flex justify-center space-x-4",
   consoleSocialIcon: "text-[#00ff00]/70 hover:text-[#00ff00] transition-colors duration-200",
 
-  // Add percentage button styles
-  percentageContainer: "flex justify-end space-x-2 mb-2",
-  percentageButton: "px-2 py-1 text-xs rounded-md bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-all duration-200",
-  percentageButtonActive: "bg-orange-500 text-white",
+  // Top bar styles
+  topBar: "flex justify-between items-center mb-4",
+  
+  // Wallet button style
+  walletButton: "!bg-transparent !border !border-[#00ff00]/50 !text-[#00ff00] !font-mono hover:!bg-[#00ff00]/10 hover:!border-[#00ff00]",
 };
 
-// Add this component at the top of the file, after the imports
+// Update the MatrixBackground component
 const MatrixBackground: React.FC = () => {
   useEffect(() => {
     const canvas = document.getElementById('matrixCanvas') as HTMLCanvasElement;
@@ -267,26 +288,21 @@ const MatrixBackground: React.FC = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケテネヘメレヱゲゼデベペオォコソホモヨョロヲゴドボポッン';
+    const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソホモヨョロヲゴゾドボポッン';
     const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const nums = '0123456789';
     const alphabet = katakana + latin + nums;
 
     const fontSize = 16;
     const columns = canvas.width / fontSize;
-
-    const rainDrops: number[] = [];
-
-    for (let x = 0; x < columns; x++) {
-      rainDrops[x] = 1;
-    }
+    const rainDrops = Array(Math.floor(columns)).fill(1);
 
     const draw = () => {
-      context.fillStyle = 'rgba(0, 0, 0, 0.1)'; // Slightly more transparent for better effect
+      context.fillStyle = 'rgba(0, 0, 0, 0.05)'; // More transparent fade
       context.fillRect(0, 0, canvas.width, canvas.height);
 
-      context.fillStyle = '#00ff00'; // Brighter Matrix green
-      context.font = fontSize + 'px "Courier New"'; // More computer-like font
+      context.fillStyle = 'rgba(0, 255, 0, 0.35)'; // Brighter characters
+      context.font = `${fontSize}px monospace`;
 
       for (let i = 0; i < rainDrops.length; i++) {
         const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
@@ -300,14 +316,12 @@ const MatrixBackground: React.FC = () => {
     };
 
     const interval = setInterval(draw, 30);
-
     const handleResize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
 
     window.addEventListener('resize', handleResize);
-
     return () => {
       clearInterval(interval);
       window.removeEventListener('resize', handleResize);
@@ -1020,13 +1034,25 @@ const SwapInterface: React.FC = () => {
                   customStyles={styles}
                 />
                 
-                <div className="flex justify-center -my-2">
+                <div className="flex justify-center -my-2 relative z-10">
                   <button 
-                    className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-all"
                     onClick={handleSwapPair}
+                    className="p-2 rounded-full bg-black border border-[#00ff00]/20 
+                      hover:border-[#00ff00]/40 hover:bg-[#00ff00]/5 
+                      transition-all duration-200 group"
                   >
-                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    <svg 
+                      className="w-5 h-5 text-[#00ff00] transform transition-transform duration-200 group-hover:scale-110" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                      />
                     </svg>
                   </button>
                 </div>

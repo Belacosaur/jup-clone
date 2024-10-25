@@ -54,34 +54,32 @@ const TokenListModal: React.FC<TokenListModalProps> = ({
 
   return (
     <>
-      <div 
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm" 
-        style={{ zIndex: 1000 }} 
-        onClick={onClose} 
-      />
-      <div 
-        className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900 rounded-2xl w-[400px] max-h-[85vh] overflow-hidden border border-gray-800"
-        style={{ zIndex: 1001 }}
-      >
-        <div className="p-4 border-b border-gray-800">
+      <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[1000]" onClick={onClose} />
+      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
+        bg-black/95 rounded-2xl w-[400px] max-h-[85vh] overflow-hidden 
+        border border-[#00ff00]/30 shadow-[0_0_30px_rgba(0,255,0,0.1)] z-[1001]">
+        
+        <div className="p-4 border-b border-[#00ff00]/20">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-white">Select Token</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <h3 className="text-lg font-mono text-[#00ff00]">Select Token</h3>
+            <button onClick={onClose} className="text-[#00ff00]/60 hover:text-[#00ff00]">
               ✕
             </button>
           </div>
           <input
             type="text"
-            placeholder="Search by token or paste address"
+            placeholder="Search tokens..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="w-full bg-black/50 text-[#00ff00] border border-[#00ff00]/30 
+              rounded-lg px-4 py-3 font-mono focus:outline-none focus:border-[#00ff00]/60
+              placeholder-[#00ff00]/30"
           />
         </div>
-        
-        <div className="overflow-y-auto max-h-[60vh]">
+
+        <div className="overflow-y-auto max-h-[60vh] scrollbar-thin scrollbar-track-black scrollbar-thumb-[#00ff00]/20">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8 text-gray-400">
+            <div className="flex items-center justify-center py-8 text-[#00ff00]/60">
               <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
                 <circle
                   className="opacity-25"
