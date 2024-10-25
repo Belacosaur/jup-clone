@@ -1,12 +1,18 @@
 import React from 'react';
 import Image from 'next/image';
 
+// Define interfaces directly since types.ts doesn't exist yet
 interface TokenInfo {
   symbol: string;
   address: string;
   decimals: number;
   logoURI?: string;
-  name?: string;
+}
+
+interface TokenBalance {
+  amount: number;
+  decimals: number;
+  formatted: string;
 }
 
 interface TokenSelectProps {
@@ -17,10 +23,11 @@ interface TokenSelectProps {
   onAmountChange: (value: string) => void;
   tokens: TokenInfo[];
   editable: boolean;
-  customStyles: any;
+  customStyles: any; // You might want to type this properly
 }
 
 const TokenSelect: React.FC<TokenSelectProps> = ({
+  label,
   value,
   onChange,
   amount,
@@ -29,17 +36,17 @@ const TokenSelect: React.FC<TokenSelectProps> = ({
   editable,
   customStyles
 }) => {
-  const selectedToken = tokens.find(token => token.address === value);
+  const selectedTokenInfo = tokens.find(token => token.address === value);
 
   return (
     <div className={customStyles.tokenSelect}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 min-w-[140px]">
           <div className="w-8 h-8 relative flex-shrink-0">
-            {selectedToken?.logoURI ? (
+            {selectedTokenInfo?.logoURI ? (
               <Image
-                src={selectedToken.logoURI}
-                alt={selectedToken.symbol}
+                src={selectedTokenInfo.logoURI}
+                alt={selectedTokenInfo.symbol}
                 width={32}
                 height={32}
                 className="rounded-full object-contain bg-gray-800 p-0.5"
@@ -50,7 +57,7 @@ const TokenSelect: React.FC<TokenSelectProps> = ({
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400">
-                {selectedToken?.symbol?.[0]}
+                {selectedTokenInfo?.symbol?.[0]}
               </div>
             )}
           </div>
@@ -73,19 +80,6 @@ const TokenSelect: React.FC<TokenSelectProps> = ({
               </option>
             ))}
           </select>
-          <svg 
-            className="w-4 h-4 text-[#00ff00]"
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2} 
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
         </div>
 
         <input
@@ -94,8 +88,7 @@ const TokenSelect: React.FC<TokenSelectProps> = ({
           onChange={(e) => onAmountChange(e.target.value)}
           placeholder="0.00"
           disabled={!editable}
-          className={`${customStyles.input} no-scrollbar`}
-          style={{ textAlign: 'right' }}
+          className={`${customStyles.input} text-right`}
         />
       </div>
     </div>

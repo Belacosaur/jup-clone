@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { QuoteResponse, SwapResponse } from '@jup-ag/api';
@@ -9,6 +9,7 @@ import TokenSelect from './TokenSelect';
 import SlippageInput from './SlippageInput';
 import TipInput from './TipInput';
 import Image from 'next/image';
+import debounce from 'lodash/debounce';
 
 interface SwapResponseData {
   swapTransaction: string;
@@ -347,6 +348,15 @@ const MatrixBackground: React.FC = () => {
   );
 };
 
+// Add this outside the component
+const balanceCache = new Map<string, {
+  balance: TokenBalance;
+  timestamp: number;
+}>();
+
+const CACHE_DURATION = 30000; // 30 seconds
+const DEBOUNCE_DELAY = 1000; // 1 second
+
 const SwapInterface: React.FC = () => {
   const { publicKey, signTransaction, signMessage } = useWallet();
   // Replace the default connection with our custom RPC
@@ -453,26 +463,51 @@ const SwapInterface: React.FC = () => {
     }
   };
 
-  // Add this useEffect to fetch token balance when input token or wallet changes
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (!publicKey || !inputToken) return;
+  // Create a memoized debounced fetch function
+  const debouncedFetchBalance = useCallback(
+    debounce(async (connection: Connection, publicKey: PublicKey, tokenAddress: string) => {
+      const cacheKey = `${publicKey.toString()}-${tokenAddress}`;
+      const cached = balanceCache.get(cacheKey);
       
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        setInputTokenBalance(cached.balance);
+        return;
+      }
+
       try {
-        const balance = await getTokenBalance(connection, publicKey, inputToken);
+        const balance = await getTokenBalance(connection, publicKey, tokenAddress);
         setInputTokenBalance(balance);
+        
+        // Update cache
+        balanceCache.set(cacheKey, {
+          balance,
+          timestamp: Date.now()
+        });
       } catch (error) {
         console.error('Error fetching balance:', error);
       }
+    }, DEBOUNCE_DELAY),
+    [] // Empty dependencies since we want this to be stable
+  );
+
+  // Update the balance fetching useEffect
+  useEffect(() => {
+    if (!publicKey || !inputToken || !connection) return;
+    
+    const fetchBalance = async () => {
+      await debouncedFetchBalance(connection, publicKey, inputToken);
     };
 
     fetchBalance();
     
-    // Set up an interval to refresh the balance
-    const intervalId = setInterval(fetchBalance, 10000); // Refresh every 10 seconds
-    
-    return () => clearInterval(intervalId);
-  }, [publicKey, inputToken, connection]);
+    // Clear the debounce on cleanup
+    return () => {
+      debouncedFetchBalance.cancel();
+    };
+  }, [publicKey, inputToken, connection, debouncedFetchBalance]);
+
+  // Remove the interval-based balance checking
+  // The balance will update when the user changes tokens or when the wallet changes
 
   const fetchQuote = async () => {
     if (!inputToken || !outputToken || !inputAmount || parseFloat(inputAmount) <= 0) return;
@@ -699,7 +734,7 @@ const SwapInterface: React.FC = () => {
               <span className={styles.consoleCursor}>{'>'}</span>
               <span className={`${styles.consoleText} ${getMessageColor(msg.type)}`}>
                 {msg.displayedText}
-                {msg.isTyping && <span className="animate-pulse">█</span>}
+                {msg.isTyping && <span className="animate-pulse"></span>}
               </span>
             </div>
           ))}
