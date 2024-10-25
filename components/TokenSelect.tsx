@@ -89,12 +89,13 @@ const TokenSelect: React.FC<TokenSelectProps> = ({
         </div>
 
         <input
-          type="number"
+          type="text"
           value={amount}
-          onChange={(e) => editable && onAmountChange(e.target.value)}
-          disabled={!editable}
+          onChange={(e) => onAmountChange(e.target.value)}
           placeholder="0.00"
-          className="bg-transparent text-white text-lg font-medium focus:outline-none text-right w-full"
+          disabled={!editable}
+          className={`${customStyles.input} no-scrollbar`}
+          style={{ textAlign: 'right' }}
         />
       </div>
     </div>

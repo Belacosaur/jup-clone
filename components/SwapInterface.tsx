@@ -32,6 +32,12 @@ interface ConsoleMessage {
   displayedText: string;
 }
 
+// Add this new interface near the top with other interfaces
+interface TokenBalance {
+  amount: number;
+  decimals: number;
+}
+
 const popularTokens = [
   { symbol: 'SOL', address: 'So11111111111111111111111111111111111111112', decimals: 9 },
   { symbol: 'USDC', address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', decimals: 6 },
@@ -121,7 +127,31 @@ const sendTransactionWithRetry = async (connection: Connection, rawTransaction: 
   }
 };
 
-// Update the styles object to remove duplicates
+// Add these helper functions
+const getTokenBalance = async (connection: Connection, publicKey: PublicKey, tokenAddress: string): Promise<TokenBalance> => {
+  try {
+    if (tokenAddress === 'So11111111111111111111111111111111111111112') {
+      const balance = await connection.getBalance(publicKey);
+      return { amount: balance, decimals: 9 };
+    }
+
+    const tokenAccount = await connection.getParsedTokenAccountsByOwner(publicKey, {
+      mint: new PublicKey(tokenAddress)
+    });
+
+    if (tokenAccount.value.length === 0) {
+      return { amount: 0, decimals: getTokenDecimals(tokenAddress) };
+    }
+
+    const { amount, decimals } = tokenAccount.value[0].account.data.parsed.info;
+    return { amount: Number(amount), decimals };
+  } catch (error) {
+    console.error('Error fetching token balance:', error);
+    return { amount: 0, decimals: getTokenDecimals(tokenAddress) };
+  }
+};
+
+// Update the styles object to remove scrollbars and add percentage buttons
 const styles = {
   // Matrix styles
   matrixContainer: "fixed inset-0 bg-black overflow-hidden z-0",
@@ -138,7 +168,7 @@ const styles = {
   // Component styles
   swapCard: "bg-gray-800/60 rounded-xl p-4 mb-4 border border-gray-700",
   tokenSelect: "bg-gray-700 hover:bg-gray-600 transition-all duration-200 rounded-lg p-3 mb-2 cursor-pointer",
-  input: "bg-transparent text-white text-lg font-medium focus:outline-none w-full",
+  input: "bg-transparent text-white text-lg font-medium focus:outline-none w-full no-scrollbar",
   exchangeRate: "text-sm text-gray-400 ml-3 mt-2",
 
   // Settings styles
@@ -188,12 +218,19 @@ const styles = {
   spinner: "animate-spin h-5 w-5",
 
   // Console styles
-  consoleContainer: "w-[420px] bg-black/80 border border-[#00ff00]/20 rounded-2xl p-4 font-mono text-sm h-[402px] overflow-hidden",
+  consoleContainer: "w-[420px] bg-black/80 border border-[#00ff00]/20 rounded-2xl p-4 font-mono text-sm h-[402px] overflow-hidden flex flex-col",
   consoleHeader: "text-[#00ff00] mb-4 pb-2 font-bold border-b border-[#00ff00]/20",
-  consoleContent: "h-[340px] overflow-y-auto space-y-1 scrollbar-thin scrollbar-track-black scrollbar-thumb-[#00ff00]/20",
-  consoleMessage: "flex items-start space-x-2 break-all whitespace-pre-wrap", 
+  consoleContent: "flex-1 overflow-y-auto space-y-1 scrollbar-thin scrollbar-track-black scrollbar-thumb-[#00ff00]/20",
+  consoleMessage: "flex items-start space-x-2 break-all whitespace-pre-wrap",
   consoleText: "text-[#00ff00] font-mono break-words flex-1",
   consoleCursor: "text-[#00ff00] mr-2",
+  consoleFooter: "mt-4 pt-2 border-t border-[#00ff00]/20 flex justify-center space-x-4",
+  consoleSocialIcon: "text-[#00ff00]/70 hover:text-[#00ff00] transition-colors duration-200",
+
+  // Add percentage button styles
+  percentageContainer: "flex justify-end space-x-2 mb-2",
+  percentageButton: "px-2 py-1 text-xs rounded-md bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-all duration-200",
+  percentageButtonActive: "bg-orange-500 text-white",
 };
 
 // Add this component at the top of the file, after the imports
@@ -277,8 +314,6 @@ const SwapInterface: React.FC = () => {
   const [jitoTip, setJitoTip] = useState<number>(0); // Auto Jito
   const [quotePrice, setQuotePrice] = useState<string>('');
   const [isSwapping, setIsSwapping] = useState(false);
-  const [swapStatus, setSwapStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [useDynamicSlippage, setUseDynamicSlippage] = useState<boolean>(true); // Dynamic slippage
   const [useDirectRoutes, setUseDirectRoutes] = useState<boolean>(false); // No direct routes
   const [showPriorityFee, setShowPriorityFee] = useState(false);
@@ -286,6 +321,9 @@ const SwapInterface: React.FC = () => {
   const [showSlippageSettings, setShowSlippageSettings] = useState(false);
   const [availableTokens, setAvailableTokens] = useState<TokenInfo[]>(popularTokens);
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
+  // Add this ref near other state declarations
+  const initialMessageRef = useRef(false);
+  const [inputTokenBalance, setInputTokenBalance] = useState<TokenBalance>({ amount: 0, decimals: 9 });
 
   useEffect(() => {
     if (inputToken && outputToken && inputAmount && parseFloat(inputAmount) > 0) {
@@ -330,8 +368,41 @@ const SwapInterface: React.FC = () => {
   // Add this useEffect near the top of the SwapInterface component
   useEffect(() => {
     // Add initial message when component mounts
-    addConsoleMessage('Follow the bald head...', 'info');
+    if (!initialMessageRef.current) {
+      addConsoleMessage('Follow the bald head...', 'info');
+      initialMessageRef.current = true;
+    }
   }, []); // Empty dependency array means this runs once on mount
+
+  // Add this function to handle token pair swapping
+  const handleSwapPair = () => {
+    setInputToken(outputToken);
+    setOutputToken(inputToken);
+    setInputAmount('');
+    setOutputAmount('');
+    setQuotePrice('');
+  };
+
+  // Add this function to handle percentage clicks
+  const handlePercentageClick = (percentage: number) => {
+    if (!inputTokenBalance) return;
+    
+    const maxAmount = inputTokenBalance.amount / Math.pow(10, inputTokenBalance.decimals);
+    const amount = (maxAmount * percentage).toFixed(inputTokenBalance.decimals);
+    setInputAmount(amount);
+  };
+
+  // Add this useEffect to fetch token balance when input token or wallet changes
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!publicKey || !inputToken) return;
+      
+      const balance = await getTokenBalance(connection, publicKey, inputToken);
+      setInputTokenBalance(balance);
+    };
+
+    fetchBalance();
+  }, [publicKey, inputToken, connection]);
 
   const fetchQuote = async () => {
     if (!inputToken || !outputToken || !inputAmount || parseFloat(inputAmount) <= 0) return;
@@ -394,10 +465,7 @@ const SwapInterface: React.FC = () => {
       return;
     }
 
-    // Set all states at once to avoid multiple renders
     setIsSwapping(true);
-    setSwapStatus('processing');
-    setErrorMessage(null);
 
     try {
       addConsoleMessage('Building transaction...', 'info');
@@ -457,14 +525,10 @@ const SwapInterface: React.FC = () => {
       const txid = await sendTransactionWithRetry(connection, signedTransaction.serialize());
       localStorage.setItem('lastTxId', txid);
       
-      // Single success message with Solscan link
-      addConsoleMessage(`View on Solscan: https://solscan.io/tx/${txid}`, 'success');
-      setSwapStatus('success');
+      addConsoleMessage(`Transaction successful! View on Solscan: https://solscan.io/tx/${txid}`, 'success');
 
     } catch (error) {
       addConsoleMessage(`Error: ${getErrorMessage(error)}`, 'error');
-      setSwapStatus('error');
-      setErrorMessage(getErrorMessage(error));
     } finally {
       setIsSwapping(false);
     }
@@ -542,55 +606,6 @@ const SwapInterface: React.FC = () => {
     </svg>
   );
 
-  const StatusMessage = ({ status, message, txid }: { status: 'idle' | 'processing' | 'success' | 'error', message?: string, txid?: string }) => {
-    if (status === 'idle') return null;
-
-    return (
-      <div
-        className={`${styles.statusContainer} ${
-          status === 'success' ? styles.statusSuccess :
-          status === 'error' ? styles.statusError :
-          styles.statusLoading
-        } transition-all duration-300`}
-      >
-        <div className={styles.statusText}>
-          {status === 'processing' && <LoadingSpinner />}
-          {status === 'success' && (
-            <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          )}
-          {status === 'error' && (
-            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          )}
-          <span className={
-            status === 'success' ? 'text-green-500' :
-            status === 'error' ? 'text-red-500' :
-            'text-[#00ff00]'
-          }>
-            {message || (
-              status === 'processing' ? 'Processing transaction...' :
-              status === 'success' ? 'Transaction successful!' :
-              'Transaction failed'
-            )}
-          </span>
-        </div>
-        {status === 'success' && txid && (
-          <a
-            href={`https://solscan.io/tx/${txid}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-center block mt-2 text-[#00ff00] hover:underline"
-          >
-            View on Solscan
-          </a>
-        )}
-      </div>
-    );
-  };
-
   const HackerConsole: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => {
     const consoleRef = useRef<HTMLDivElement>(null);
 
@@ -626,6 +641,28 @@ const SwapInterface: React.FC = () => {
               </span>
             </div>
           ))}
+        </div>
+        <div className={styles.consoleFooter}>
+          <a 
+            href="https://x.com/belacosaursol" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className={styles.consoleSocialIcon}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+          </a>
+          <a 
+            href="https://github.com/belacosaur" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className={styles.consoleSocialIcon}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.463 2 11.97c0 4.404 2.865 8.14 6.839 9.458.5.092.682-.216.682-.48 0-.236-.008-.864-.013-1.695-2.782.602-3.369-1.337-3.369-1.337-.454-1.151-1.11-1.458-1.11-1.458-.908-.618.069-.606.069-.606 1.003.07 1.531 1.027 1.531 1.027.892 1.524 2.341 1.084 2.91.828.092-.643.35-1.083.636-1.332-2.22-.251-4.555-1.107-4.555-4.927 0-1.088.39-1.979 1.029-2.675-.103-.252-.446-1.266.098-2.638 0 0 .84-.268 2.75 1.022A9.607 9.607 0 0112 6.82c.85.004 1.705.114 2.504.336 1.909-1.29 2.747-1.022 2.747-1.022.546 1.372.202 2.386.1 2.638.64.696 1.028 1.587 1.028 2.675 0 3.83-2.339 4.673-4.566 4.92.359.307.678.915.678 1.846 0 1.332-.012 2.407-.012 2.734 0 .267.18.577.688.48C19.137 20.107 22 16.373 22 11.969 22 6.463 17.522 2 12 2z"/>
+            </svg>
+          </a>
         </div>
       </div>
     );
@@ -676,7 +713,7 @@ const SwapInterface: React.FC = () => {
       <div className={styles.mainContainer}>
         <header className={styles.header}>
           <h1 className={styles.headerTitle}>BelacSwap</h1>
-          <WalletMultiButton />
+          <WalletMultiButton className={styles.walletButton} />
         </header>
         
         <div className={styles.container}>
@@ -718,19 +755,40 @@ const SwapInterface: React.FC = () => {
               </div>
               
               <div className={styles.swapCard}>
+                {publicKey && (
+                  <div className={styles.percentageContainer}>
+                    {[0.25, 0.5, 0.75, 1].map((percentage) => (
+                      <button
+                        key={percentage}
+                        className={`${styles.percentageButton} ${
+                          inputAmount === ((inputTokenBalance.amount * percentage) / Math.pow(10, inputTokenBalance.decimals)).toFixed(inputTokenBalance.decimals)
+                            ? styles.percentageButtonActive
+                            : ''
+                        }`}
+                        onClick={() => handlePercentageClick(percentage)}
+                      >
+                        {percentage * 100}%
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <TokenSelect
                   label="From"
                   value={inputToken}
                   onChange={setInputToken}
                   amount={inputAmount}
                   onAmountChange={setInputAmount}
-                  tokens={availableTokens}  // Use availableTokens instead of popularTokens
+                  tokens={availableTokens}
                   editable={true}
                   customStyles={styles}
                 />
                 
                 <div className="flex justify-center -my-2">
-                  <button className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-all">
+                  <button 
+                    className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-all"
+                    onClick={handleSwapPair}
+                  >
                     <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                     </svg>
@@ -743,7 +801,7 @@ const SwapInterface: React.FC = () => {
                   onChange={setOutputToken}
                   amount={outputAmount}
                   onAmountChange={() => {}}
-                  tokens={availableTokens}  // Changed from popularTokens to availableTokens
+                  tokens={availableTokens}
                   editable={false}
                   customStyles={styles}
                 />
@@ -756,82 +814,23 @@ const SwapInterface: React.FC = () => {
               </div>
 
               <button
-                className={`${styles.button} ${!publicKey ? 'bg-[#00ff00] hover:bg-[#00ff00]/80' : ''} 
-                  ${isSwapping ? 'cursor-not-allowed opacity-75' : ''}`}
-                onClick={() => {
-                  if (!publicKey) {
-                    const walletButton = document.querySelector('.wallet-adapter-button-trigger') as HTMLButtonElement;
-                    if (walletButton) {
-                      walletButton.click();
-                    }
-                    return;
-                  }
-                  handleSwap();
-                }}
+                className={styles.button}
+                onClick={handleSwap}
                 disabled={isSwapping}
               >
-                {!publicKey ? (
+                {isSwapping ? (
                   <div className="flex items-center justify-center gap-2">
-                    <svg 
-                      className="w-5 h-5" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      />
-                    </svg>
-                    Connect Wallet
+                    <LoadingSpinner />
+                    Swapping...
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-2">
-                    {isSwapping && <LoadingSpinner />}
-                    {isSwapping ? 'Swapping...' : 'Swap'}
-                  </div>
+                  'Swap'
                 )}
               </button>
-
-              <StatusMessage 
-                status={swapStatus} 
-                message={errorMessage || undefined}
-                txid={swapStatus === 'success' ? localStorage.getItem('lastTxId') || undefined : undefined}
-              />
-              
-              {/* Add this before the final closing div */}
-              <div className={styles.socialsContainer}>
-                <a 
-                  href="https://x.com/belacosaursol" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className={styles.socialLink}
-                >
-                  <Image
-                    src="/twitter.svg"
-                    alt="Twitter"
-                    width={24}
-                    height={24}
-                  />
-                </a>
-                <a 
-                  href="https://github.com/belacosaur" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className={styles.socialLink}
-                >
-                  <Image
-                    src="/github.svg"
-                    alt="GitHub"
-                    width={24}
-                    height={24}
-                  />
-                </a>
-              </div>
             </div>
           </div>
+
+          {/* Console on the right */}
           <HackerConsole messages={consoleMessages} />
         </div>
       </div>
