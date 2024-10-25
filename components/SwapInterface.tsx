@@ -23,13 +23,13 @@ const popularTokens = [
 const defaultTipOptions = [0, 100000, 500000, 1000000]; // in lamports
 const defaultJitoOptions = [0, 10, 200, 1000]; // in micro-lamports per compute unit
 
+// Add this near the top of the file with other constants
+const RPC_ENDPOINT = process.env.NEXT_PUBLIC_HELIUS_RPC || 'https://api.mainnet-beta.solana.com';
+
 // Update the tip display to show in SOL
 const formatTipDisplay = (lamports: number) => {
   return `${(lamports / 1e9).toFixed(6)} SOL`;
 };
-
-// Update the RPC endpoints to more reliable ones
-const HELIUS_RPC = 'https://mainnet.helius-rpc.com/?api-key=3632daae-4968-4896-9d0d-43f382188194';
 
 // Add retry logic for RPC calls
 const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, initialDelay = 1000) => {
@@ -45,6 +45,26 @@ const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3, initialD
   }
 };
 
+// Add this helper function at the top with other utility functions
+const getErrorMessage = (error: any): string => {
+  if (typeof error === 'object' && error !== null) {
+    // Check for insufficient funds error
+    if (error.message?.includes('Custom:6001')) {
+      return 'Insufficient SOL balance. Please ensure you have enough SOL to cover the swap and transaction fees.';
+    }
+    // Check for other common errors
+    if (error.message?.includes('0x1')) {
+      return 'Insufficient token balance for swap';
+    }
+    if (error.message?.includes('BlockhashNotFound')) {
+      return 'Network congestion detected. Please try again.';
+    }
+    return error.message || 'An unknown error occurred';
+  }
+  return 'An unknown error occurred';
+};
+
+// Update the sendTransactionWithRetry function's error handling
 const sendTransactionWithRetry = async (connection: Connection, rawTransaction: Uint8Array) => {
   try {
     const txid = await retryWithBackoff(async () => {
@@ -56,12 +76,10 @@ const sendTransactionWithRetry = async (connection: Connection, rawTransaction: 
     });
     console.log('Transaction sent:', txid);
 
-    // Get fresh blockhash with retry
     const { blockhash, lastValidBlockHeight } = await retryWithBackoff(() => 
       connection.getLatestBlockhash('confirmed')
     );
 
-    // Wait for confirmation with retry
     const confirmation = await retryWithBackoff(() =>
       connection.confirmTransaction({
         signature: txid,
@@ -71,13 +89,15 @@ const sendTransactionWithRetry = async (connection: Connection, rawTransaction: 
     );
 
     if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      const error = JSON.stringify(confirmation.value.err);
+      throw new Error(`Transaction failed: ${error}`);
     }
 
     return txid;
   } catch (error) {
     console.error('Transaction error:', error);
-    throw error;
+    // Rethrow with more specific error message
+    throw new Error(getErrorMessage(error));
   }
 };
 
@@ -115,7 +135,11 @@ const styles = {
 
 const SwapInterface: React.FC = () => {
   const { publicKey, signTransaction, signMessage } = useWallet();
-  const { connection } = useConnection();
+  // Replace the default connection with our custom RPC
+  const connection = new Connection(RPC_ENDPOINT, {
+    commitment: 'confirmed',
+    confirmTransactionInitialTimeout: 60000
+  });
   const [inputToken, setInputToken] = useState<string>(popularTokens[0].address);
   const [outputToken, setOutputToken] = useState<string>(popularTokens[1].address);
   const [inputAmount, setInputAmount] = useState<string>('');
@@ -199,7 +223,21 @@ const SwapInterface: React.FC = () => {
 
   const handleSwap = async () => {
     if (!publicKey || !signTransaction || !connection) {
-      setErrorMessage('Wallet not connected');
+      setErrorMessage('Please connect your wallet');
+      return;
+    }
+
+    // Check SOL balance before swap
+    try {
+      const balance = await connection.getBalance(publicKey);
+      const minimumBalance = 10000000; // 0.01 SOL minimum
+      if (balance < minimumBalance) {
+        setErrorMessage('Insufficient SOL balance. Please ensure you have enough SOL to cover transaction fees.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking balance:', error);
+      setErrorMessage('Unable to check balance. Please try again.');
       return;
     }
 
@@ -263,7 +301,7 @@ const SwapInterface: React.FC = () => {
     } catch (error) {
       console.error('Swap error:', error);
       setSwapStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Unknown error occurred');
+      setErrorMessage(getErrorMessage(error));
     } finally {
       setIsSwapping(false);
     }
