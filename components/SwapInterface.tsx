@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { QuoteResponse, SwapResponse } from '@jup-ag/api';
@@ -21,6 +21,15 @@ interface TokenInfo {
   decimals: number;
   logoURI?: string;
   name?: string;
+}
+
+// Add these interfaces at the top
+interface ConsoleMessage {
+  id: number;
+  text: string;
+  type: 'info' | 'success' | 'error';
+  isTyping: boolean;
+  displayedText: string;
 }
 
 const popularTokens = [
@@ -121,9 +130,9 @@ const styles = {
   // Layout styles
   mainContainer: "h-screen flex flex-col relative z-10 overflow-hidden",
   header: "w-full flex justify-between items-center px-6 py-4",
-  headerTitle: "text-[#00ff00] font-mono text-2xl tracking-wider font-bold",
-  container: "flex-1 flex items-center justify-center",
-  swapWrapper: "w-full max-w-[440px] mx-4 p-1 bg-gradient-to-br from-gray-900/90 to-black/90 rounded-2xl shadow-2xl backdrop-blur-sm",
+  headerTitle: "text-[#00ff00] font-mono text-3xl tracking-wider font-bold",
+  container: "flex-1 flex items-center justify-center gap-8",
+  swapWrapper: "w-full max-w-[420px] mx-4 p-1 bg-gradient-to-br from-gray-900/90 to-black/90 rounded-2xl shadow-2xl backdrop-blur-sm", // Reduced from 460px
   innerContainer: "bg-gray-900/60 rounded-2xl p-4 backdrop-blur-md border border-[#00ff00]/20",
 
   // Component styles
@@ -177,6 +186,14 @@ const styles = {
   statusLoading: "border-[#00ff00]/20 bg-[#00ff00]/10",
   statusText: "text-center flex items-center justify-center gap-2",
   spinner: "animate-spin h-5 w-5",
+
+  // Console styles
+  consoleContainer: "w-[420px] bg-black/80 border border-[#00ff00]/20 rounded-2xl p-4 font-mono text-sm h-[402px] overflow-hidden",
+  consoleHeader: "text-[#00ff00] mb-4 pb-2 font-bold border-b border-[#00ff00]/20",
+  consoleContent: "h-[340px] overflow-y-auto space-y-1 scrollbar-thin scrollbar-track-black scrollbar-thumb-[#00ff00]/20",
+  consoleMessage: "flex items-start space-x-2 break-all whitespace-pre-wrap", 
+  consoleText: "text-[#00ff00] font-mono break-words flex-1",
+  consoleCursor: "text-[#00ff00] mr-2",
 };
 
 // Add this component at the top of the file, after the imports
@@ -190,7 +207,7 @@ const MatrixBackground: React.FC = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソホモヨョロヲゴゾドボポヴッン';
+    const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソホモヨョロヲゴゾドボポッン';
     const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const nums = '0123456789';
     const alphabet = katakana + latin + nums;
@@ -268,6 +285,7 @@ const SwapInterface: React.FC = () => {
   const [showJitoTip, setShowJitoTip] = useState(false);
   const [showSlippageSettings, setShowSlippageSettings] = useState(false);
   const [availableTokens, setAvailableTokens] = useState<TokenInfo[]>(popularTokens);
+  const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
 
   useEffect(() => {
     if (inputToken && outputToken && inputAmount && parseFloat(inputAmount) > 0) {
@@ -308,6 +326,12 @@ const SwapInterface: React.FC = () => {
 
     fetchTopTokens();
   }, []);
+
+  // Add this useEffect near the top of the SwapInterface component
+  useEffect(() => {
+    // Add initial message when component mounts
+    addConsoleMessage('Follow the bald head...', 'info');
+  }, []); // Empty dependency array means this runs once on mount
 
   const fetchQuote = async () => {
     if (!inputToken || !outputToken || !inputAmount || parseFloat(inputAmount) <= 0) return;
@@ -365,84 +389,80 @@ const SwapInterface: React.FC = () => {
   };
 
   const handleSwap = async () => {
-    if (!publicKey || !signTransaction || !connection) {
-      setErrorMessage('Please connect your wallet');
+    if (!publicKey || !signTransaction) {
+      addConsoleMessage('Wallet not connected', 'error');
       return;
     }
 
-    // Check SOL balance before swap
-    try {
-      const balance = await connection.getBalance(publicKey);
-      const minimumBalance = 10000000; // 0.01 SOL minimum
-      if (balance < minimumBalance) {
-        setErrorMessage('Insufficient SOL balance. Please ensure you have enough SOL to cover transaction fees.');
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking balance:', error);
-      setErrorMessage('Unable to check balance. Please try again.');
-      return;
-    }
-
+    // Set all states at once to avoid multiple renders
     setIsSwapping(true);
     setSwapStatus('processing');
     setErrorMessage(null);
 
     try {
-      // Get blockhash with retry
-      const { blockhash } = await retryWithBackoff(() => 
-        connection.getLatestBlockhash('confirmed')
-      );
-      
+      addConsoleMessage('Building transaction...', 'info');
       const inputDecimals = getTokenDecimals(inputToken);
       const amount = Math.floor(parseFloat(inputAmount) * Math.pow(10, inputDecimals)).toString();
       
-      // Get quote with retry
-      const quoteData = await retryWithBackoff(async () => {
-        const quoteUrl = new URL('https://quote-api.jup.ag/v6/quote');
-        quoteUrl.searchParams.append('inputMint', inputToken);
-        quoteUrl.searchParams.append('outputMint', outputToken);
-        quoteUrl.searchParams.append('amount', amount);
-        quoteUrl.searchParams.append('onlyDirectRoutes', useDirectRoutes.toString());
-        if (!useDynamicSlippage) {
-          quoteUrl.searchParams.append('slippageBps', (slippage * 100).toString());
-        }
-
-        const response = await fetch(quoteUrl.toString());
-        if (!response.ok) throw new Error(`Quote API error: ${response.statusText}`);
-        return await response.json();
-      });
-
-      // Get swap transaction with retry
-      const swapData = await retryWithBackoff(async () => {
-        const swapResponse = await fetch('https://quote-api.jup.ag/v6/swap', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            quoteResponse: quoteData,
-            userPublicKey: publicKey.toString(),
-            wrapUnwrapSOL: true,
-            prioritizationFeeLamports: tip > 0 ? tip : "auto",
-            computeUnitPriceMicroLamports: jitoTip > 0 ? jitoTip : undefined,
-            dynamicComputeUnitLimit: true
-          })
-        });
-
-        if (!swapResponse.ok) throw new Error(`Swap API error: ${swapResponse.statusText}`);
-        return await swapResponse.json();
-      });
+      // Only include slippageBps if not using dynamic slippage
+      const slippageBps = useDynamicSlippage ? undefined : Math.floor(slippage * 100);
       
+      const quoteUrl = new URL('https://quote-api.jup.ag/v6/quote');
+      quoteUrl.searchParams.append('inputMint', inputToken);
+      quoteUrl.searchParams.append('outputMint', outputToken);
+      quoteUrl.searchParams.append('amount', amount);
+      quoteUrl.searchParams.append('onlyDirectRoutes', useDirectRoutes.toString());
+      if (!useDynamicSlippage) {
+        quoteUrl.searchParams.append('slippageBps', slippageBps!.toString());
+      }
+      
+      const response = await fetch(quoteUrl.toString());
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const quoteData: QuoteResponse = await response.json();
+
+      // Get the swap transaction
+      addConsoleMessage('Requesting wallet approval...', 'info');
+      const swapResponse = await fetch('https://quote-api.jup.ag/v6/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quoteResponse: quoteData,
+          userPublicKey: publicKey.toString(),
+          wrapUnwrapSOL: true,
+          prioritizationFeeLamports: tip > 0 ? tip : "auto",
+          computeUnitPriceMicroLamports: jitoTip > 0 ? jitoTip : undefined,
+          dynamicComputeUnitLimit: true
+        })
+      });
+
+      if (!swapResponse.ok) {
+        throw new Error(`Swap API error: ${swapResponse.statusText}`);
+      }
+
+      const swapData: SwapResponseData = await swapResponse.json();
+      const { blockhash } = await retryWithBackoff(() => 
+        connection.getLatestBlockhash('confirmed')
+      );
+
       let transaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
       transaction.message.recentBlockhash = blockhash;
       
       const signedTransaction = await signTransaction(transaction);
+      
+      addConsoleMessage('Sending transaction...', 'info');
       const txid = await sendTransactionWithRetry(connection, signedTransaction.serialize());
       localStorage.setItem('lastTxId', txid);
+      
+      // Single success message with Solscan link
+      addConsoleMessage(`View on Solscan: https://solscan.io/tx/${txid}`, 'success');
       setSwapStatus('success');
-      console.log('Swap successful! Transaction ID:', txid);
 
     } catch (error) {
-      console.error('Swap error:', error);
+      addConsoleMessage(`Error: ${getErrorMessage(error)}`, 'error');
       setSwapStatus('error');
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -569,6 +589,85 @@ const SwapInterface: React.FC = () => {
         )}
       </div>
     );
+  };
+
+  const HackerConsole: React.FC<{ messages: ConsoleMessage[] }> = ({ messages }) => {
+    const consoleRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      if (consoleRef.current) {
+        consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+      }
+    }, [messages]);
+
+    const getMessageColor = (type: string) => {
+      switch (type) {
+        case 'success':
+          return 'text-green-400';
+        case 'error':
+          return 'text-red-400';
+        default:
+          return 'text-[#00ff00]';
+      }
+    };
+
+    return (
+      <div className={styles.consoleContainer}>
+        <div className={styles.consoleHeader}>
+          {'>'} TRANSACTION LOG <span className="animate-pulse">█</span>
+        </div>
+        <div className={styles.consoleContent} ref={consoleRef}>
+          {messages.map((msg) => (
+            <div key={msg.id} className={styles.consoleMessage}>
+              <span className={styles.consoleCursor}>{'>'}</span>
+              <span className={`${styles.consoleText} ${getMessageColor(msg.type)}`}>
+                {msg.displayedText}
+                {msg.isTyping && <span className="animate-pulse">█</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const addConsoleMessage = (text: string, type: 'info' | 'success' | 'error' = 'info') => {
+    const newMessage = {
+      id: Date.now(),
+      text,
+      type,
+      isTyping: true,
+      displayedText: ''
+    };
+    
+    setConsoleMessages(prev => [...prev, newMessage]);
+
+    // Animate the text typing
+    let currentIndex = 0;
+    const typingInterval = setInterval(() => {
+      setConsoleMessages(prev => prev.map(msg => {
+        if (msg.id === newMessage.id) {
+          currentIndex++;
+          const newDisplayedText = text.slice(0, currentIndex);
+          const isComplete = currentIndex > text.length;
+          
+          if (isComplete) {
+            clearInterval(typingInterval);
+          }
+
+          return {
+            ...msg,
+            displayedText: newDisplayedText,
+            isTyping: !isComplete
+          };
+        }
+        return msg;
+      }));
+
+      if (currentIndex > text.length) {
+        clearInterval(typingInterval);
+      }
+    }, 30); // Adjust typing speed here (lower number = faster)
   };
 
   return (
@@ -733,6 +832,7 @@ const SwapInterface: React.FC = () => {
               </div>
             </div>
           </div>
+          <HackerConsole messages={consoleMessages} />
         </div>
       </div>
     </>
