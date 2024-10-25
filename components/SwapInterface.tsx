@@ -14,6 +14,15 @@ interface SwapResponseData {
   swapTransaction: string;
 }
 
+// Add this interface at the top with other interfaces
+interface TokenInfo {
+  symbol: string;
+  address: string;
+  decimals: number;
+  logoURI?: string;
+  name?: string;
+}
+
 const popularTokens = [
   { symbol: 'SOL', address: 'So11111111111111111111111111111111111111112', decimals: 9 },
   { symbol: 'USDC', address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', decimals: 6 },
@@ -250,6 +259,7 @@ const SwapInterface: React.FC = () => {
   const [showPriorityFee, setShowPriorityFee] = useState(false);
   const [showJitoTip, setShowJitoTip] = useState(false);
   const [showSlippageSettings, setShowSlippageSettings] = useState(false);
+  const [availableTokens, setAvailableTokens] = useState<TokenInfo[]>(popularTokens);
 
   useEffect(() => {
     if (inputToken && outputToken && inputAmount && parseFloat(inputAmount) > 0) {
@@ -259,6 +269,37 @@ const SwapInterface: React.FC = () => {
       setQuotePrice('');
     }
   }, [inputToken, outputToken, inputAmount, slippage]);
+
+  // Add this useEffect to fetch tokens when component mounts
+  useEffect(() => {
+    const fetchTopTokens = async () => {
+      try {
+        // Fetch token list from Jupiter
+        const response = await fetch('https://token.jup.ag/strict');
+        if (!response.ok) throw new Error('Failed to fetch tokens');
+        
+        const data = await response.json();
+        
+        // Sort by volume/activity (assuming the API returns this info)
+        // Take top 50 tokens
+        const topTokens = data.slice(0, 50).map((token: any) => ({
+          symbol: token.symbol,
+          address: token.address,
+          decimals: token.decimals,
+          logoURI: token.logoURI,
+          name: token.name
+        }));
+
+        setAvailableTokens(topTokens);
+      } catch (error) {
+        console.error('Error fetching tokens:', error);
+        // Fallback to default popularTokens if fetch fails
+        setAvailableTokens(popularTokens);
+      }
+    };
+
+    fetchTopTokens();
+  }, []);
 
   const fetchQuote = async () => {
     if (!inputToken || !outputToken || !inputAmount || parseFloat(inputAmount) <= 0) return;
@@ -509,7 +550,7 @@ const SwapInterface: React.FC = () => {
                   onChange={setInputToken}
                   amount={inputAmount}
                   onAmountChange={setInputAmount}
-                  tokens={popularTokens}
+                  tokens={availableTokens}  // Use availableTokens instead of popularTokens
                   editable={true}
                   customStyles={styles}
                 />
@@ -528,7 +569,7 @@ const SwapInterface: React.FC = () => {
                   onChange={setOutputToken}
                   amount={outputAmount}
                   onAmountChange={() => {}}
-                  tokens={popularTokens}
+                  tokens={availableTokens}  // Changed from popularTokens to availableTokens
                   editable={false}
                   customStyles={styles}
                 />
