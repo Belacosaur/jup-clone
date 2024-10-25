@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { QuoteResponse, SwapResponse } from '@jup-ag/api';
 import { PublicKey, Transaction, VersionedTransaction, sendAndConfirmRawTransaction, Connection, TransactionMessage, VersionedMessage } from '@solana/web3.js';
 import TokenSelect from './TokenSelect';
@@ -134,6 +135,80 @@ const styles = {
   settingsButton: "flex items-center space-x-1 px-2 py-1 rounded-lg hover:bg-gray-700 transition-all duration-200 text-gray-300 hover:text-white text-sm",
   socialsContainer: "mt-6 flex justify-center space-x-4",
   socialLink: "opacity-70 hover:opacity-100 transition-opacity duration-200",
+  matrixContainer: "fixed inset-0 bg-black overflow-hidden z-0",
+  matrixCanvas: "opacity-20",  // Adjust opacity as needed
+  mainContainer: "h-screen flex flex-col relative z-10 overflow-hidden",
+  header: "w-full flex justify-between items-center px-6 py-4",
+  container: "flex-1 flex items-center justify-center",
+  swapWrapper: "w-full max-w-[440px] mx-4 p-1 bg-gradient-to-br from-gray-900/90 to-black/90 rounded-2xl shadow-2xl backdrop-blur-sm", // renamed from innerWrapper
+  innerContainer: "bg-gray-900/60 rounded-2xl p-4 backdrop-blur-md border border-[#00ff00]/20",
+  headerTitle: "text-[#00ff00] font-mono text-2xl tracking-wider font-bold",
+  walletButton: "!bg-transparent !border-[#00ff00] !text-[#00ff00] !font-mono hover:!bg-[#00ff00]/10",
+};
+
+// Add this component at the top of the file, after the imports
+const MatrixBackground: React.FC = () => {
+  useEffect(() => {
+    const canvas = document.getElementById('matrixCanvas') as HTMLCanvasElement;
+    const context = canvas.getContext('2d');
+
+    if (!context) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン';
+    const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const nums = '0123456789';
+    const alphabet = katakana + latin + nums;
+
+    const fontSize = 16;
+    const columns = canvas.width / fontSize;
+
+    const rainDrops: number[] = [];
+
+    for (let x = 0; x < columns; x++) {
+      rainDrops[x] = 1;
+    }
+
+    const draw = () => {
+      context.fillStyle = 'rgba(0, 0, 0, 0.1)'; // Slightly more transparent for better effect
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      context.fillStyle = '#00ff00'; // Brighter Matrix green
+      context.font = fontSize + 'px "Courier New"'; // More computer-like font
+
+      for (let i = 0; i < rainDrops.length; i++) {
+        const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+        context.fillText(text, i * fontSize, rainDrops[i] * fontSize);
+
+        if (rainDrops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          rainDrops[i] = 0;
+        }
+        rainDrops[i]++;
+      }
+    };
+
+    const interval = setInterval(draw, 30);
+
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  return (
+    <div className={styles.matrixContainer}>
+      <canvas id="matrixCanvas" className={styles.matrixCanvas} />
+    </div>
+  );
 };
 
 const SwapInterface: React.FC = () => {
@@ -365,196 +440,139 @@ const SwapInterface: React.FC = () => {
   );
 
   return (
-    <div className={styles.container}>
-      <div className={styles.innerContainer}>
-        <h2 className={styles.title}>
-          <span>Swap Tokens</span>
-          <span className="text-orange-500">🔥</span>
-        </h2>
+    <>
+      <MatrixBackground />
+      <div className={styles.mainContainer}>
+        <header className={styles.header}>
+          <h1 className={styles.headerTitle}>BelacSwap</h1>
+          <WalletMultiButton />
+        </header>
         
-        {/* Top Settings Bar */}
-        <div className={styles.topBar}>
-          <div className={styles.settingsGroup}>
-            <button
-              className={styles.settingsButton}
-              onClick={() => setShowSlippageSettings(true)}
-            >
-              ⚙️ {useDynamicSlippage ? 'Dynamic' : `${slippage}%`}
-            </button>
-            <button
-              className={styles.settingsButton}
-              onClick={() => setShowPriorityFee(true)}
-            >
-              💰 {tip > 0 ? formatTipDisplay(tip) : 'Auto'}
-            </button>
-            <button
-              className={styles.settingsButton}
-              onClick={() => setShowJitoTip(true)}
-            >
-              ⚡ {jitoTip > 0 ? `${jitoTip}µ◎` : 'Auto'}
-            </button>
-          </div>
+        <div className={styles.container}>
+          <div className={styles.swapWrapper}>
+            <div className={styles.innerContainer}>
+              {/* Top Settings Bar */}
+              <div className={styles.topBar}>
+                <div className={styles.settingsGroup}>
+                  <button
+                    className={styles.settingsButton}
+                    onClick={() => setShowSlippageSettings(true)}
+                  >
+                    ⚙️ {useDynamicSlippage ? 'Dynamic' : `${slippage}%`}
+                  </button>
+                  <button
+                    className={styles.settingsButton}
+                    onClick={() => setShowPriorityFee(true)}
+                  >
+                    💰 {tip > 0 ? formatTipDisplay(tip) : 'Auto'}
+                  </button>
+                  <button
+                    className={styles.settingsButton}
+                    onClick={() => setShowJitoTip(true)}
+                  >
+                    ⚡ {jitoTip > 0 ? `${jitoTip}µ◎` : 'Auto'}
+                  </button>
+                </div>
 
-          <div className="flex-1" /> {/* Spacer */}
+                <div className="flex-1" /> {/* Spacer */}
 
-          <div className={styles.settingsGroup}>
-            <button
-              className={`${styles.toggleButton} ${useDirectRoutes ? styles.toggleActive : styles.toggleInactive}`}
-              onClick={() => setUseDirectRoutes(!useDirectRoutes)}
-            >
-              Direct Routes
-            </button>
-          </div>
-        </div>
-        
-        <div className={styles.swapCard}>
-          <TokenSelect
-            label="From"
-            value={inputToken}
-            onChange={setInputToken}
-            amount={inputAmount}
-            onAmountChange={setInputAmount}
-            tokens={popularTokens}
-            editable={true}
-            customStyles={styles}
-          />
-          
-          <div className="flex justify-center -my-2">
-            <button className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-all">
-              <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </svg>
-            </button>
-          </div>
+                <div className={styles.settingsGroup}>
+                  <button
+                    className={`${styles.toggleButton} ${useDirectRoutes ? styles.toggleActive : styles.toggleInactive}`}
+                    onClick={() => setUseDirectRoutes(!useDirectRoutes)}
+                  >
+                    Direct Routes
+                  </button>
+                </div>
+              </div>
+              
+              <div className={styles.swapCard}>
+                <TokenSelect
+                  label="From"
+                  value={inputToken}
+                  onChange={setInputToken}
+                  amount={inputAmount}
+                  onAmountChange={setInputAmount}
+                  tokens={popularTokens}
+                  editable={true}
+                  customStyles={styles}
+                />
+                
+                <div className="flex justify-center -my-2">
+                  <button className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-all">
+                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                  </button>
+                </div>
 
-          <TokenSelect
-            label="To (Estimated)"
-            value={outputToken}
-            onChange={setOutputToken}
-            amount={outputAmount}
-            onAmountChange={() => {}}
-            tokens={popularTokens}
-            editable={false}
-            customStyles={styles}
-          />
-          
-          {quotePrice && (
-            <div className={styles.exchangeRate}>
-              {quotePrice}
+                <TokenSelect
+                  label="To (Estimated)"
+                  value={outputToken}
+                  onChange={setOutputToken}
+                  amount={outputAmount}
+                  onAmountChange={() => {}}
+                  tokens={popularTokens}
+                  editable={false}
+                  customStyles={styles}
+                />
+                
+                {quotePrice && (
+                  <div className={styles.exchangeRate}>
+                    {quotePrice}
+                  </div>
+                )}
+              </div>
+
+              <button
+                className={styles.button}
+                onClick={handleSwap}
+                disabled={isSwapping}
+              >
+                {isSwapping ? 'Swapping...' : 'Swap'}
+              </button>
+
+              {swapStatus === 'success' && (
+                <div className={styles.successText}>Swap successful!</div>
+              )}
+              {swapStatus === 'error' && errorMessage && (
+                <div className={styles.errorText}>{errorMessage}</div>
+              )}
+              
+              {/* Add this before the final closing div */}
+              <div className={styles.socialsContainer}>
+                <a 
+                  href="https://x.com/belacosaursol" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className={styles.socialLink}
+                >
+                  <Image
+                    src="/twitter.svg"
+                    alt="Twitter"
+                    width={24}
+                    height={24}
+                  />
+                </a>
+                <a 
+                  href="https://github.com/belacosaur" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className={styles.socialLink}
+                >
+                  <Image
+                    src="/github.svg"
+                    alt="GitHub"
+                    width={24}
+                    height={24}
+                  />
+                </a>
+              </div>
             </div>
-          )}
-        </div>
-
-        <button
-          className={styles.button}
-          onClick={handleSwap}
-          disabled={isSwapping}
-        >
-          {isSwapping ? 'Swapping...' : 'Swap'}
-        </button>
-
-        {swapStatus === 'success' && (
-          <div className={styles.successText}>Swap successful!</div>
-        )}
-        {swapStatus === 'error' && errorMessage && (
-          <div className={styles.errorText}>{errorMessage}</div>
-        )}
-        
-        {/* Add this before the final closing div */}
-        <div className={styles.socialsContainer}>
-          <a 
-            href="https://x.com/belacosaursol" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className={styles.socialLink}
-          >
-            <Image
-              src="/twitter.svg"
-              alt="Twitter"
-              width={24}
-              height={24}
-            />
-          </a>
-          <a 
-            href="https://github.com/belacosaur" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className={styles.socialLink}
-          >
-            <Image
-              src="/github.svg"
-              alt="GitHub"
-              width={24}
-              height={24}
-            />
-          </a>
+          </div>
         </div>
       </div>
-
-      {showSlippageSettings && <SlippagePopup />}
-
-      {showPriorityFee && (
-        <>
-          <div className={styles.popupOverlay} onClick={() => setShowPriorityFee(false)} />
-          <div className={styles.popup}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-medium">Priority Fee</h3>
-              <button
-                onClick={() => setShowPriorityFee(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {defaultTipOptions.map((option) => (
-                <button
-                  key={option}
-                  className={`${styles.feeButton} ${tip === option ? styles.feeButtonActive : styles.feeButtonInactive}`}
-                  onClick={() => {
-                    setTip(option);
-                    setShowPriorityFee(false);
-                  }}
-                >
-                  {formatTipDisplay(option)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {showJitoTip && (
-        <>
-          <div className={styles.popupOverlay} onClick={() => setShowJitoTip(false)} />
-          <div className={styles.popup}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-medium">Jito Tip (µ◎/CU)</h3>
-              <button
-                onClick={() => setShowJitoTip(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {defaultJitoOptions.map((option) => (
-                <button
-                  key={option}
-                  className={`${styles.feeButton} ${jitoTip === option ? styles.feeButtonActive : styles.feeButtonInactive}`}
-                  onClick={() => {
-                    setJitoTip(option);
-                    setShowJitoTip(false);
-                  }}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+    </>
   );
 };
 

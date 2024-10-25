@@ -18,11 +18,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className="h-full">
+      <body className={`${inter.className} h-full overflow-hidden`}>
         <ClientErrorBoundary>
           <WalletContextProvider>
-            <Header />
             {children}
           </WalletContextProvider>
         </ClientErrorBoundary>
