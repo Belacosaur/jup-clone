@@ -39,6 +39,25 @@ const nextConfig = {
         hostname: '*.hubspotusercontent-na1.net',
         port: '',
         pathname: '/**',
+      },
+      // Add IPFS/NFT.storage domains
+      {
+        protocol: 'https',
+        hostname: '*.ipfs.nftstorage.link',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'bafkreidvkvuzyslw5jh5z242lgzwzhbi2kxxnpkic5wsvyno5ikvpr7reu.ipfs.nftstorage.link',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.ipfs.dweb.link',
+        port: '',
+        pathname: '/**',
       }
     ],
   },
