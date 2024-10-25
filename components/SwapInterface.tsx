@@ -7,6 +7,7 @@ import { PublicKey, Transaction, VersionedTransaction, sendAndConfirmRawTransact
 import TokenSelect from './TokenSelect';
 import SlippageInput from './SlippageInput';
 import TipInput from './TipInput';
+import Image from 'next/image';
 
 interface SwapResponseData {
   swapTransaction: string;
@@ -131,6 +132,8 @@ const styles = {
   topBar: "flex items-center space-x-2 mb-4",
   settingsGroup: "flex items-center space-x-1 bg-gray-800 rounded-lg p-1",
   settingsButton: "flex items-center space-x-1 px-2 py-1 rounded-lg hover:bg-gray-700 transition-all duration-200 text-gray-300 hover:text-white text-sm",
+  socialsContainer: "mt-6 flex justify-center space-x-4",
+  socialLink: "opacity-70 hover:opacity-100 transition-opacity duration-200",
 };
 
 const SwapInterface: React.FC = () => {
@@ -456,6 +459,36 @@ const SwapInterface: React.FC = () => {
         {swapStatus === 'error' && errorMessage && (
           <div className={styles.errorText}>{errorMessage}</div>
         )}
+        
+        {/* Add this before the final closing div */}
+        <div className={styles.socialsContainer}>
+          <a 
+            href="https://x.com/belacosaursol" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className={styles.socialLink}
+          >
+            <Image
+              src="/twitter.svg"
+              alt="Twitter"
+              width={24}
+              height={24}
+            />
+          </a>
+          <a 
+            href="https://github.com/belacosaur" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className={styles.socialLink}
+          >
+            <Image
+              src="/github.svg"
+              alt="GitHub"
+              width={24}
+              height={24}
+            />
+          </a>
+        </div>
       </div>
 
       {showSlippageSettings && <SlippagePopup />}
