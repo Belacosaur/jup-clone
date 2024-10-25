@@ -169,6 +169,14 @@ const styles = {
   // Social styles
   socialsContainer: "mt-6 flex justify-center space-x-4",
   socialLink: "opacity-70 hover:opacity-100 transition-opacity duration-200",
+
+  // Status styles
+  statusContainer: "mt-4 p-4 rounded-xl border",
+  statusSuccess: "border-green-500/20 bg-green-500/10",
+  statusError: "border-red-500/20 bg-red-500/10",
+  statusLoading: "border-[#00ff00]/20 bg-[#00ff00]/10",
+  statusText: "text-center flex items-center justify-center gap-2",
+  spinner: "animate-spin h-5 w-5",
 };
 
 // Add this component at the top of the file, after the imports
@@ -182,7 +190,7 @@ const MatrixBackground: React.FC = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソ��ホモヨョロヲゴゾドボポヴッン';
+    const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソホモヨョロヲゴゾドボポヴッン';
     const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const nums = '0123456789';
     const alphabet = katakana + latin + nums;
@@ -429,7 +437,7 @@ const SwapInterface: React.FC = () => {
       
       const signedTransaction = await signTransaction(transaction);
       const txid = await sendTransactionWithRetry(connection, signedTransaction.serialize());
-      
+      localStorage.setItem('lastTxId', txid);
       setSwapStatus('success');
       console.log('Swap successful! Transaction ID:', txid);
 
@@ -495,6 +503,73 @@ const SwapInterface: React.FC = () => {
       <span className="text-sm">{label}</span>
     </button>
   );
+
+  const LoadingSpinner = () => (
+    <svg className={styles.spinner} viewBox="0 0 24 24">
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+
+  const StatusMessage = ({ status, message, txid }: { status: 'idle' | 'processing' | 'success' | 'error', message?: string, txid?: string }) => {
+    if (status === 'idle') return null;
+
+    return (
+      <div
+        className={`${styles.statusContainer} ${
+          status === 'success' ? styles.statusSuccess :
+          status === 'error' ? styles.statusError :
+          styles.statusLoading
+        } transition-all duration-300`}
+      >
+        <div className={styles.statusText}>
+          {status === 'processing' && <LoadingSpinner />}
+          {status === 'success' && (
+            <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          {status === 'error' && (
+            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
+          <span className={
+            status === 'success' ? 'text-green-500' :
+            status === 'error' ? 'text-red-500' :
+            'text-[#00ff00]'
+          }>
+            {message || (
+              status === 'processing' ? 'Processing transaction...' :
+              status === 'success' ? 'Transaction successful!' :
+              'Transaction failed'
+            )}
+          </span>
+        </div>
+        {status === 'success' && txid && (
+          <a
+            href={`https://solscan.io/tx/${txid}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-center block mt-2 text-[#00ff00] hover:underline"
+          >
+            View on Solscan
+          </a>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -582,10 +657,10 @@ const SwapInterface: React.FC = () => {
               </div>
 
               <button
-                className={`${styles.button} ${!publicKey ? 'bg-[#00ff00] hover:bg-[#00ff00]/80' : ''}`} // Add Matrix green for connect state
+                className={`${styles.button} ${!publicKey ? 'bg-[#00ff00] hover:bg-[#00ff00]/80' : ''} 
+                  ${isSwapping ? 'cursor-not-allowed opacity-75' : ''}`}
                 onClick={() => {
                   if (!publicKey) {
-                    // Find and click the wallet adapter button
                     const walletButton = document.querySelector('.wallet-adapter-button-trigger') as HTMLButtonElement;
                     if (walletButton) {
                       walletButton.click();
@@ -613,15 +688,19 @@ const SwapInterface: React.FC = () => {
                     </svg>
                     Connect Wallet
                   </div>
-                ) : isSwapping ? 'Swapping...' : 'Swap'}
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    {isSwapping && <LoadingSpinner />}
+                    {isSwapping ? 'Swapping...' : 'Swap'}
+                  </div>
+                )}
               </button>
 
-              {swapStatus === 'success' && (
-                <div className={styles.successText}>Swap successful!</div>
-              )}
-              {swapStatus === 'error' && errorMessage && (
-                <div className={styles.errorText}>{errorMessage}</div>
-              )}
+              <StatusMessage 
+                status={swapStatus} 
+                message={errorMessage || undefined}
+                txid={swapStatus === 'success' ? localStorage.getItem('lastTxId') || undefined : undefined}
+              />
               
               {/* Add this before the final closing div */}
               <div className={styles.socialsContainer}>
