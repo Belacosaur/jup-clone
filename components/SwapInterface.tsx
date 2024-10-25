@@ -10,40 +10,13 @@ import SlippageInput from './SlippageInput';
 import TipInput from './TipInput';
 import Image from 'next/image';
 import debounce from 'lodash/debounce';
-
-interface SwapResponseData {
-  swapTransaction: string;
-}
-
-// Add this interface at the top with other interfaces
-interface TokenInfo {
-  symbol: string;
-  address: string;
-  decimals: number;
-  logoURI?: string;
-  name?: string;
-}
-
-// Add these interfaces at the top
-interface ConsoleMessage {
-  id: number;
-  text: string;
-  type: 'info' | 'success' | 'error';
-  isTyping: boolean;
-  displayedText: string;
-}
-
-// Add this new interface near the top with other interfaces
-interface TokenBalance {
-  amount: number;
-  decimals: number;
-  formatted: string; // Add formatted balance
-}
+import { TokenInfo, TokenBalance, ConsoleMessage, SwapResponseData } from '../types';
 
 const popularTokens = [
   { symbol: 'SOL', address: 'So11111111111111111111111111111111111111112', decimals: 9 },
   { symbol: 'USDC', address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', decimals: 6 },
   { symbol: 'BONK', address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', decimals: 5 },
+  { symbol: 'DEGOD', address: 'BQedGfRa7xks1mScbzpUUBe2w8mRqNyFQ1SN4LcGBYE5', decimals: 9 },
   { symbol: 'RAY', address: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R', decimals: 6 },
   { symbol: 'SRM', address: 'SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt', decimals: 6 },
 ];
@@ -216,9 +189,9 @@ const styles = {
   innerContainer: "bg-gray-900/60 rounded-2xl p-4 backdrop-blur-md border border-[#00ff00]/20",
 
   // Component styles
-  swapCard: "bg-gray-800/60 rounded-xl p-4 mb-4 border border-gray-700",
-  tokenSelect: "bg-gray-700 hover:bg-gray-600 transition-all duration-200 rounded-lg p-3 mb-2 cursor-pointer",
-  input: "bg-transparent text-white text-lg font-medium focus:outline-none w-full no-scrollbar",
+  swapCard: "space-y-2", // Remove padding and border as it's now in TokenSelect
+  tokenSelect: "w-full", // Simplified token select styles
+  input: "w-full bg-transparent text-white text-right text-2xl font-medium focus:outline-none",
   exchangeRate: "text-sm text-gray-400 ml-3 mt-2",
 
   // Settings styles
@@ -294,7 +267,7 @@ const MatrixBackground: React.FC = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソホモヨョロヲゴゾドボポッン';
+    const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケテネヘメレヱゲゼデベペオォコソホモヨョロヲゴドボポッン';
     const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const nums = '0123456789';
     const alphabet = katakana + latin + nums;
@@ -348,18 +321,25 @@ const MatrixBackground: React.FC = () => {
   );
 };
 
-// Add this outside the component
-const balanceCache = new Map<string, {
-  balance: TokenBalance;
-  timestamp: number;
-}>();
+// Move these interfaces and constants outside the component
+interface TokenPrice {
+  id: string;
+  mintSymbol: string;
+  vsToken: string;
+  vsTokenSymbol: string;
+  price: number;
+}
 
 const CACHE_DURATION = 30000; // 30 seconds
 const DEBOUNCE_DELAY = 1000; // 1 second
 
 const SwapInterface: React.FC = () => {
+  // Move all useState declarations inside the component
+  const [tokenPrices, setTokenPrices] = useState<{ [key: string]: number }>({});
+  const [walletTokens, setWalletTokens] = useState<{ [key: string]: TokenBalance }>({});
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false);
+  const [tokenBalances, setTokenBalances] = useState<{ [key: string]: TokenBalance }>({});
   const { publicKey, signTransaction, signMessage } = useWallet();
-  // Replace the default connection with our custom RPC
   const connection = new Connection(RPC_ENDPOINT, {
     commitment: 'confirmed',
     confirmTransactionInitialTimeout: 60000
@@ -384,6 +364,36 @@ const SwapInterface: React.FC = () => {
   const initialMessageRef = useRef(false);
   const [inputTokenBalance, setInputTokenBalance] = useState<TokenBalance>({ amount: 0, decimals: 9, formatted: '0' });
 
+  // Create a balanceCache ref instead of a global variable
+  const balanceCache = useRef(new Map<string, {
+    balance: TokenBalance;
+    timestamp: number;
+  }>());
+
+  // Move the fetchTokenPrices function inside the component
+  const fetchTokenPrices = async () => {
+    try {
+      const response = await fetch('https://price.jup.ag/v4/price');
+      if (!response.ok) throw new Error('Failed to fetch prices');
+      
+      const data = await response.json();
+      const prices: { [key: string]: number } = {};
+      
+      Object.entries(data.data).forEach(([address, priceData]: [string, any]) => {
+        if (priceData.price) {
+          prices[address] = priceData.price;
+        }
+      });
+
+      setTokenPrices(prices);
+      
+      localStorage.setItem('tokenPrices', JSON.stringify(prices));
+      localStorage.setItem('pricesTimestamp', Date.now().toString());
+    } catch (error) {
+      console.error('Error fetching prices:', error);
+    }
+  };
+
   useEffect(() => {
     if (inputToken && outputToken && inputAmount && parseFloat(inputAmount) > 0) {
       fetchQuote();
@@ -397,26 +407,43 @@ const SwapInterface: React.FC = () => {
   useEffect(() => {
     const fetchTopTokens = async () => {
       try {
+        // First check localStorage cache
+        const cachedTokens = localStorage.getItem('tokenList');
+        const cacheTimestamp = localStorage.getItem('tokenListTimestamp');
+        const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
+
+        if (cachedTokens && cacheTimestamp) {
+          const isExpired = Date.now() - Number(cacheTimestamp) > CACHE_DURATION;
+          if (!isExpired) {
+            setAvailableTokens(JSON.parse(cachedTokens));
+            return;
+          }
+        }
+
         // Fetch token list from Jupiter
         const response = await fetch('https://token.jup.ag/strict');
         if (!response.ok) throw new Error('Failed to fetch tokens');
         
         const data = await response.json();
         
-        // Sort by volume/activity (assuming the API returns this info)
-        // Take top 50 tokens
-        const topTokens = data.slice(0, 50).map((token: any) => ({
-          symbol: token.symbol,
-          address: token.address,
-          decimals: token.decimals,
-          logoURI: token.logoURI,
-          name: token.name
-        }));
+        // Map tokens and include decimals
+        const topTokens = data
+          .slice(0, 50)
+          .map((token: any) => ({
+            symbol: token.symbol,
+            address: token.address,
+            decimals: token.decimals || 9, // Use provided decimals or default to 9
+            logoURI: token.logoURI,
+            name: token.name
+          }));
+
+        // Cache the tokens
+        localStorage.setItem('tokenList', JSON.stringify(topTokens));
+        localStorage.setItem('tokenListTimestamp', Date.now().toString());
 
         setAvailableTokens(topTokens);
       } catch (error) {
         console.error('Error fetching tokens:', error);
-        // Fallback to default popularTokens if fetch fails
         setAvailableTokens(popularTokens);
       }
     };
@@ -467,7 +494,7 @@ const SwapInterface: React.FC = () => {
   const debouncedFetchBalance = useCallback(
     debounce(async (connection: Connection, publicKey: PublicKey, tokenAddress: string) => {
       const cacheKey = `${publicKey.toString()}-${tokenAddress}`;
-      const cached = balanceCache.get(cacheKey);
+      const cached = balanceCache.current.get(cacheKey);
       
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
         setInputTokenBalance(cached.balance);
@@ -479,7 +506,7 @@ const SwapInterface: React.FC = () => {
         setInputTokenBalance(balance);
         
         // Update cache
-        balanceCache.set(cacheKey, {
+        balanceCache.current.set(cacheKey, {
           balance,
           timestamp: Date.now()
         });
@@ -804,6 +831,117 @@ const SwapInterface: React.FC = () => {
     }, 30); // Adjust typing speed here (lower number = faster)
   };
 
+  // Update your balance fetching logic to fetch all token balances
+  const fetchAllBalances = async () => {
+    if (!publicKey || !connection) return;
+    
+    // Only fetch balances for displayed tokens (input and output)
+    const tokensToFetch = [inputToken, outputToken];
+    const balances: { [key: string]: TokenBalance } = {};
+    
+    for (const tokenAddress of tokensToFetch) {
+      try {
+        const balance = await getTokenBalance(connection, publicKey, tokenAddress);
+        balances[tokenAddress] = balance;
+      } catch (error) {
+        console.error(`Error fetching balance for ${tokenAddress}:`, error);
+      }
+    }
+    
+    setTokenBalances(balances);
+  };
+
+  // Add this useEffect to fetch balances when wallet connects
+  useEffect(() => {
+    if (publicKey) {
+      fetchAllBalances();
+    }
+  }, [publicKey, inputToken, outputToken]); // Only refetch when these change
+
+  // Update the fetchWalletTokens function
+  const fetchWalletTokens = async () => {
+    if (!publicKey || !connection) return;
+    
+    setIsLoadingWallet(true);
+    const balances: { [key: string]: TokenBalance } = {};
+    
+    try {
+      // Fetch prices first
+      await fetchTokenPrices();
+
+      // First get SOL balance
+      const solBalance = await connection.getBalance(publicKey);
+      balances[popularTokens[0].address] = {
+        amount: solBalance,
+        decimals: 9,
+        formatted: (solBalance / 1e9).toFixed(9),
+        usdValue: (solBalance / 1e9) * (tokenPrices[popularTokens[0].address] || 0)
+      };
+
+      // Get all token accounts
+      const tokenAccounts = await connection.getParsedProgramAccounts(
+        new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+        {
+          filters: [
+            { dataSize: 165 },
+            {
+              memcmp: {
+                offset: 32,
+                bytes: publicKey.toBase58(),
+              },
+            },
+          ],
+        }
+      );
+
+      // Process token accounts
+      for (const account of tokenAccounts) {
+        const parsedAccountData: any = account.account.data;
+        const tokenBalance = parsedAccountData.parsed?.info?.tokenAmount;
+        const mintAddress = parsedAccountData.parsed?.info?.mint;
+
+        if (tokenBalance && mintAddress) {
+          const amount = Number(tokenBalance.amount);
+          const decimals = tokenBalance.decimals;
+
+          if (amount > 0) {
+            const formatted = (amount / Math.pow(10, decimals)).toFixed(decimals);
+            const price = tokenPrices[mintAddress] || 0;
+            
+            balances[mintAddress] = {
+              amount,
+              decimals,
+              formatted,
+              usdValue: Number(formatted) * price
+            };
+          }
+        }
+      }
+
+      setWalletTokens(balances);
+      setTokenBalances(balances);
+      
+    } catch (error) {
+      console.error('Error fetching wallet tokens:', error);
+      addConsoleMessage('Error loading wallet tokens', 'error');
+    } finally {
+      setIsLoadingWallet(false);
+    }
+  };
+
+  // Update the wallet connection useEffect to clear cache when connecting
+  useEffect(() => {
+    if (publicKey) {
+      // Clear cache when wallet changes
+      localStorage.removeItem('walletTokens');
+      localStorage.removeItem('walletTokensTimestamp');
+      fetchWalletTokens();
+    } else {
+      setWalletTokens({});
+      setTokenBalances({});
+    }
+  }, [publicKey]); // Only depend on publicKey changes
+
   return (
     <>
       <MatrixBackground />
@@ -877,6 +1015,7 @@ const SwapInterface: React.FC = () => {
                   amount={inputAmount}
                   onAmountChange={setInputAmount}
                   tokens={availableTokens}
+                  balances={tokenBalances}
                   editable={true}
                   customStyles={styles}
                 />
@@ -899,6 +1038,7 @@ const SwapInterface: React.FC = () => {
                   amount={outputAmount}
                   onAmountChange={() => {}}
                   tokens={availableTokens}
+                  balances={walletTokens}  // Use walletTokens instead of tokenBalances
                   editable={false}
                   customStyles={styles}
                 />
