@@ -36,6 +36,7 @@ interface ConsoleMessage {
 interface TokenBalance {
   amount: number;
   decimals: number;
+  formatted: string; // Add formatted balance
 }
 
 const popularTokens = [
@@ -130,25 +131,73 @@ const sendTransactionWithRetry = async (connection: Connection, rawTransaction: 
 // Add these helper functions
 const getTokenBalance = async (connection: Connection, publicKey: PublicKey, tokenAddress: string): Promise<TokenBalance> => {
   try {
+    // Handle SOL balance
     if (tokenAddress === 'So11111111111111111111111111111111111111112') {
       const balance = await connection.getBalance(publicKey);
-      return { amount: balance, decimals: 9 };
+      return {
+        amount: balance,
+        decimals: 9,
+        formatted: (balance / 1e9).toFixed(9)
+      };
     }
 
-    const tokenAccount = await connection.getParsedTokenAccountsByOwner(publicKey, {
-      mint: new PublicKey(tokenAddress)
+    // Handle SPL tokens
+    const tokenMint = new PublicKey(tokenAddress);
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
+      mint: tokenMint
     });
 
-    if (tokenAccount.value.length === 0) {
-      return { amount: 0, decimals: getTokenDecimals(tokenAddress) };
+    // If no token account exists, return zero balance
+    if (tokenAccounts.value.length === 0) {
+      const decimals = getTokenDecimals(tokenAddress);
+      return {
+        amount: 0,
+        decimals,
+        formatted: '0'
+      };
     }
 
-    const { amount, decimals } = tokenAccount.value[0].account.data.parsed.info;
-    return { amount: Number(amount), decimals };
+    // Get the token account with the highest balance
+    const tokenAccount = tokenAccounts.value.reduce((prev, curr) => {
+      const prevAmount = Number(prev.account.data.parsed.info.tokenAmount.amount);
+      const currAmount = Number(curr.account.data.parsed.info.tokenAmount.amount);
+      return prevAmount > currAmount ? prev : curr;
+    });
+
+    const { amount, decimals } = tokenAccount.account.data.parsed.info.tokenAmount;
+    const numericAmount = Number(amount);
+    const formatted = (numericAmount / Math.pow(10, decimals)).toFixed(decimals);
+
+    return {
+      amount: numericAmount,
+      decimals,
+      formatted
+    };
   } catch (error) {
     console.error('Error fetching token balance:', error);
-    return { amount: 0, decimals: getTokenDecimals(tokenAddress) };
+    const decimals = getTokenDecimals(tokenAddress);
+    return {
+      amount: 0,
+      decimals,
+      formatted: '0'
+    };
   }
+};
+
+// Add this helper function near other utility functions
+const getTokenDecimals = (address: string): number => {
+  const token = popularTokens.find(token => token.address === address);
+  if (!token) {
+    console.warn(`Token decimals not found for address ${address}, defaulting to 9`);
+    return 9; // Default to 9 decimals (SOL's decimal places) if token not found
+  }
+  return token.decimals;
+};
+
+// Add this helper function if it's not already present
+const getTokenSymbol = (address: string): string => {
+  const token = popularTokens.find(token => token.address === address);
+  return token?.symbol || 'Unknown';
 };
 
 // Update the styles object to remove scrollbars and add percentage buttons
@@ -323,7 +372,7 @@ const SwapInterface: React.FC = () => {
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
   // Add this ref near other state declarations
   const initialMessageRef = useRef(false);
-  const [inputTokenBalance, setInputTokenBalance] = useState<TokenBalance>({ amount: 0, decimals: 9 });
+  const [inputTokenBalance, setInputTokenBalance] = useState<TokenBalance>({ amount: 0, decimals: 9, formatted: '0' });
 
   useEffect(() => {
     if (inputToken && outputToken && inputAmount && parseFloat(inputAmount) > 0) {
@@ -384,12 +433,24 @@ const SwapInterface: React.FC = () => {
   };
 
   // Add this function to handle percentage clicks
-  const handlePercentageClick = (percentage: number) => {
-    if (!inputTokenBalance) return;
+  const handlePercentageClick = async (percentage: number) => {
+    if (!publicKey || !inputToken) return;
     
-    const maxAmount = inputTokenBalance.amount / Math.pow(10, inputTokenBalance.decimals);
-    const amount = (maxAmount * percentage).toFixed(inputTokenBalance.decimals);
-    setInputAmount(amount);
+    try {
+      // Fetch latest balance
+      const balance = await getTokenBalance(connection, publicKey, inputToken);
+      
+      // Calculate the amount based on the percentage
+      const amount = (Number(balance.formatted) * percentage).toFixed(balance.decimals);
+      
+      // Update the input amount
+      setInputAmount(amount);
+      
+      // Update the stored balance
+      setInputTokenBalance(balance);
+    } catch (error) {
+      console.error('Error calculating percentage:', error);
+    }
   };
 
   // Add this useEffect to fetch token balance when input token or wallet changes
@@ -397,11 +458,20 @@ const SwapInterface: React.FC = () => {
     const fetchBalance = async () => {
       if (!publicKey || !inputToken) return;
       
-      const balance = await getTokenBalance(connection, publicKey, inputToken);
-      setInputTokenBalance(balance);
+      try {
+        const balance = await getTokenBalance(connection, publicKey, inputToken);
+        setInputTokenBalance(balance);
+      } catch (error) {
+        console.error('Error fetching balance:', error);
+      }
     };
 
     fetchBalance();
+    
+    // Set up an interval to refresh the balance
+    const intervalId = setInterval(fetchBalance, 10000); // Refresh every 10 seconds
+    
+    return () => clearInterval(intervalId);
   }, [publicKey, inputToken, connection]);
 
   const fetchQuote = async () => {
@@ -449,14 +519,6 @@ const SwapInterface: React.FC = () => {
       setOutputAmount('');
       setQuotePrice('');
     }
-  };
-
-  const getTokenSymbol = (address: string) => {
-    return popularTokens.find(token => token.address === address)?.symbol || 'Unknown';
-  };
-
-  const getTokenDecimals = (address: string) => {
-    return popularTokens.find(token => token.address === address)?.decimals || 9;
   };
 
   const handleSwap = async () => {
@@ -761,7 +823,7 @@ const SwapInterface: React.FC = () => {
                       <button
                         key={percentage}
                         className={`${styles.percentageButton} ${
-                          inputAmount === ((inputTokenBalance.amount * percentage) / Math.pow(10, inputTokenBalance.decimals)).toFixed(inputTokenBalance.decimals)
+                          inputAmount === (Number(inputTokenBalance.formatted) * percentage).toFixed(inputTokenBalance.decimals)
                             ? styles.percentageButtonActive
                             : ''
                         }`}
