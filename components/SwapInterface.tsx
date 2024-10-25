@@ -103,47 +103,63 @@ const sendTransactionWithRetry = async (connection: Connection, rawTransaction: 
   }
 };
 
-// Add these CSS classes at the top of your file
+// Update the styles object to remove duplicates
 const styles = {
-  container: "max-w-[440px] mx-auto mt-10 p-1 bg-gradient-to-br from-gray-900 to-black rounded-2xl shadow-2xl",
-  innerContainer: "bg-gray-900 rounded-2xl p-4",
-  title: "text-2xl font-bold mb-6 text-white flex items-center justify-between",
-  swapCard: "bg-gray-800 rounded-xl p-4 mb-4 border border-gray-700",
+  // Matrix styles
+  matrixContainer: "fixed inset-0 bg-black overflow-hidden z-0",
+  matrixCanvas: "opacity-20",
+
+  // Layout styles
+  mainContainer: "h-screen flex flex-col relative z-10 overflow-hidden",
+  header: "w-full flex justify-between items-center px-6 py-4",
+  headerTitle: "text-[#00ff00] font-mono text-2xl tracking-wider font-bold",
+  container: "flex-1 flex items-center justify-center",
+  swapWrapper: "w-full max-w-[440px] mx-4 p-1 bg-gradient-to-br from-gray-900/90 to-black/90 rounded-2xl shadow-2xl backdrop-blur-sm",
+  innerContainer: "bg-gray-900/60 rounded-2xl p-4 backdrop-blur-md border border-[#00ff00]/20",
+
+  // Component styles
+  swapCard: "bg-gray-800/60 rounded-xl p-4 mb-4 border border-gray-700",
   tokenSelect: "bg-gray-700 hover:bg-gray-600 transition-all duration-200 rounded-lg p-3 mb-2 cursor-pointer",
   input: "bg-transparent text-white text-lg font-medium focus:outline-none w-full",
   exchangeRate: "text-sm text-gray-400 ml-3 mt-2",
+
+  // Settings styles
   settingsContainer: "bg-gray-800 rounded-xl p-4 mb-4 border border-gray-700",
-  checkbox: "form-checkbox h-4 w-4 text-orange-500 rounded border-gray-600 bg-gray-700 focus:ring-orange-500",
-  checkboxLabel: "text-sm font-medium text-gray-300 select-none",
+  settingsGroup: "flex items-center space-x-1 bg-gray-800 rounded-lg p-1",
+  settingsButton: "flex items-center space-x-1 px-2 py-1 rounded-lg hover:bg-gray-700 transition-all duration-200 text-gray-300 hover:text-white text-sm",
+  
+  // Button styles
   button: `w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 px-4 rounded-xl 
     font-semibold transition-all duration-200 transform hover:scale-[1.02] hover:shadow-lg 
     active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`,
   feeButton: `px-3 py-1.5 rounded-lg transition-all duration-200 text-sm font-medium`,
   feeButtonActive: "bg-orange-500 text-white shadow-lg",
   feeButtonInactive: "bg-gray-700 text-gray-300 hover:bg-gray-600",
-  successText: "mt-2 text-green-400 text-center",
-  errorText: "mt-2 text-red-400 text-center",
+  walletButton: "!bg-transparent !border-[#00ff00] !text-[#00ff00] !font-mono hover:!bg-[#00ff00]/10",
+
+  // Toggle styles
   toggleContainer: "flex items-center space-x-2 mb-4 bg-gray-800 p-1 rounded-lg",
   toggleButton: "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
   toggleActive: "bg-gray-700 text-white shadow-sm",
   toggleInactive: "text-gray-400 hover:text-gray-300",
-  settingsIcon: "p-2 rounded-lg hover:bg-gray-700 transition-all duration-200",
+
+  // Popup styles
   popup: "absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 rounded-xl border border-gray-700 shadow-xl p-4 w-72 z-50",
   popupOverlay: "fixed inset-0 bg-black bg-opacity-50 z-40",
+
+  // Status styles
+  successText: "mt-2 text-green-400 text-center",
+  errorText: "mt-2 text-red-400 text-center",
+
+  // Misc styles
   topBar: "flex items-center space-x-2 mb-4",
-  settingsGroup: "flex items-center space-x-1 bg-gray-800 rounded-lg p-1",
-  settingsButton: "flex items-center space-x-1 px-2 py-1 rounded-lg hover:bg-gray-700 transition-all duration-200 text-gray-300 hover:text-white text-sm",
+  checkbox: "form-checkbox h-4 w-4 text-orange-500 rounded border-gray-600 bg-gray-700 focus:ring-orange-500",
+  checkboxLabel: "text-sm font-medium text-gray-300 select-none",
+  settingsIcon: "p-2 rounded-lg hover:bg-gray-700 transition-all duration-200",
+
+  // Social styles
   socialsContainer: "mt-6 flex justify-center space-x-4",
   socialLink: "opacity-70 hover:opacity-100 transition-opacity duration-200",
-  matrixContainer: "fixed inset-0 bg-black overflow-hidden z-0",
-  matrixCanvas: "opacity-20",  // Adjust opacity as needed
-  mainContainer: "h-screen flex flex-col relative z-10 overflow-hidden",
-  header: "w-full flex justify-between items-center px-6 py-4",
-  container: "flex-1 flex items-center justify-center",
-  swapWrapper: "w-full max-w-[440px] mx-4 p-1 bg-gradient-to-br from-gray-900/90 to-black/90 rounded-2xl shadow-2xl backdrop-blur-sm", // renamed from innerWrapper
-  innerContainer: "bg-gray-900/60 rounded-2xl p-4 backdrop-blur-md border border-[#00ff00]/20",
-  headerTitle: "text-[#00ff00] font-mono text-2xl tracking-wider font-bold",
-  walletButton: "!bg-transparent !border-[#00ff00] !text-[#00ff00] !font-mono hover:!bg-[#00ff00]/10",
 };
 
 // Add this component at the top of the file, after the imports
