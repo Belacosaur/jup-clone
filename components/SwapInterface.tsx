@@ -10,7 +10,7 @@ import SlippageInput from './SlippageInput';
 import TipInput from './TipInput';
 import Image from 'next/image';
 import debounce from 'lodash/debounce';
-import { TokenInfo, TokenBalance, ConsoleMessage, SwapResponseData } from '../types';
+import { TokenInfo, TokenBalance, ConsoleMessage, SwapResponseData, QuickNodeMetisResponse } from '../types';
 
 const popularTokens = [
   { symbol: 'SOL', address: 'So11111111111111111111111111111111111111112', decimals: 9 },
@@ -550,45 +550,51 @@ const SwapInterface: React.FC = () => {
   // Remove the interval-based balance checking
   // The balance will update when the user changes tokens or when the wallet changes
 
+  const QUICKNODE_RPC = process.env.NEXT_PUBLIC_QUICKNODE_RPC || 'YOUR_QUICKNODE_RPC_URL';
+
   const fetchQuote = async () => {
     if (!inputToken || !outputToken || !inputAmount || parseFloat(inputAmount) <= 0) return;
 
     try {
       const inputDecimals = getTokenDecimals(inputToken);
-      const outputDecimals = getTokenDecimals(outputToken);
-      
       const amount = (parseFloat(inputAmount) * Math.pow(10, inputDecimals)).toString();
       
-      // Only include slippageBps if not using dynamic slippage
-      const slippageBps = useDynamicSlippage ? undefined : Math.floor(slippage * 100);
-      
-      const quoteUrl = new URL('https://quote-api.jup.ag/v6/quote');
-      quoteUrl.searchParams.append('inputMint', inputToken);
-      quoteUrl.searchParams.append('outputMint', outputToken);
-      quoteUrl.searchParams.append('amount', amount);
-      quoteUrl.searchParams.append('onlyDirectRoutes', useDirectRoutes.toString());
-      if (!useDynamicSlippage) {
-        quoteUrl.searchParams.append('slippageBps', slippageBps!.toString());
-      }
-      
-      const response = await fetch(quoteUrl.toString());
-      
+      const response = await fetch(process.env.NEXT_PUBLIC_QUICKNODE_RPC, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'metis',
+          method: 'metis_swapQuote',
+          params: {
+            inputMint: inputToken,
+            outputMint: outputToken,
+            amount: amount,
+            slippageBps: Math.floor(slippage * 100),
+            onlyDirectRoutes: useDirectRoutes
+          }
+        })
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const quoteData: QuoteResponse = await response.json();
-      
-      const outAmountFloat = parseFloat(quoteData.outAmount) / Math.pow(10, outputDecimals);
-      const formattedOutputAmount = outAmountFloat.toFixed(outputDecimals);
+
+      const data = await response.json();
+      const quoteData = data.result;
+
+      const outAmountFloat = parseFloat(quoteData.outAmount) / Math.pow(10, getTokenDecimals(outputToken));
+      const formattedOutputAmount = outAmountFloat.toFixed(getTokenDecimals(outputToken));
       setOutputAmount(formattedOutputAmount);
-      
+
       const inAmountFloat = parseFloat(quoteData.inAmount) / Math.pow(10, inputDecimals);
       const exchangeRate = outAmountFloat / inAmountFloat;
-      
+
       const inputSymbol = getTokenSymbol(inputToken);
       const outputSymbol = getTokenSymbol(outputToken);
-      
+
       setQuotePrice(`1 ${inputSymbol} = ${exchangeRate.toFixed(6)} ${outputSymbol}`);
     } catch (error) {
       console.error('Error fetching quote:', error);
@@ -609,60 +615,45 @@ const SwapInterface: React.FC = () => {
       addConsoleMessage('Building transaction...', 'info');
       const inputDecimals = getTokenDecimals(inputToken);
       const amount = Math.floor(parseFloat(inputAmount) * Math.pow(10, inputDecimals)).toString();
-      
-      // Only include slippageBps if not using dynamic slippage
-      const slippageBps = useDynamicSlippage ? undefined : Math.floor(slippage * 100);
-      
-      const quoteUrl = new URL('https://quote-api.jup.ag/v6/quote');
-      quoteUrl.searchParams.append('inputMint', inputToken);
-      quoteUrl.searchParams.append('outputMint', outputToken);
-      quoteUrl.searchParams.append('amount', amount);
-      quoteUrl.searchParams.append('onlyDirectRoutes', useDirectRoutes.toString());
-      if (!useDynamicSlippage) {
-        quoteUrl.searchParams.append('slippageBps', slippageBps!.toString());
-      }
-      
-      const response = await fetch(quoteUrl.toString());
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const quoteData: QuoteResponse = await response.json();
 
-      // Get the swap transaction
-      addConsoleMessage('Requesting wallet approval...', 'info');
-      const swapResponse = await fetch('https://quote-api.jup.ag/v6/swap', {
+      const response = await fetch(process.env.NEXT_PUBLIC_QUICKNODE_RPC, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          quoteResponse: quoteData,
-          userPublicKey: publicKey.toString(),
-          wrapUnwrapSOL: true,
-          prioritizationFeeLamports: tip > 0 ? tip : "auto",
-          computeUnitPriceMicroLamports: jitoTip > 0 ? jitoTip : undefined,
-          dynamicComputeUnitLimit: true
+          jsonrpc: '2.0',
+          id: 'metis',
+          method: 'metis_swapTransaction',
+          params: {
+            userPublicKey: publicKey.toString(),
+            inputMint: inputToken,
+            outputMint: outputToken,
+            amount: amount,
+            slippageBps: Math.floor(slippage * 100),
+            onlyDirectRoutes: useDirectRoutes,
+            computeUnitPriceMicroLamports: jitoTip > 0 ? jitoTip : undefined,
+            prioritizationFeeLamports: tip > 0 ? tip : undefined
+          }
         })
       });
 
-      if (!swapResponse.ok) {
-        throw new Error(`Swap API error: ${swapResponse.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Swap API error: ${response.statusText}`);
       }
 
-      const swapData: SwapResponseData = await swapResponse.json();
-      const { blockhash } = await retryWithBackoff(() => 
-        connection.getLatestBlockhash('confirmed')
-      );
+      const data = await response.json();
+      const swapData = data.result;
 
-      let transaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
-      transaction.message.recentBlockhash = blockhash;
+      addConsoleMessage('Requesting wallet approval...', 'info');
       
+      let transaction = VersionedTransaction.deserialize(Buffer.from(swapData.transaction, 'base64'));
       const signedTransaction = await signTransaction(transaction);
-      
+
       addConsoleMessage('Sending transaction...', 'info');
       const txid = await sendTransactionWithRetry(connection, signedTransaction.serialize());
       localStorage.setItem('lastTxId', txid);
-      
+
       addConsoleMessage(`Transaction successful! View on Solscan: https://solscan.io/tx/${txid}`, 'success');
 
     } catch (error) {

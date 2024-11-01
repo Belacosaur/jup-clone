@@ -30,3 +30,27 @@ export interface SwapResponseData {
   computeUnitLimit?: number;
   computeUnitPrice?: number;
 }
+
+// Add these interfaces
+export interface QuickNodeMetisResponse {
+  inAmount: string;
+  outAmount: string;
+  priceImpactPct: number;
+  marketInfos: any[];
+  transaction?: string;
+  swapMode: string;
+}
+
+export interface QuickNodeMetisQuote {
+  inAmount: string;
+  outAmount: string;
+  priceImpactPct: number;
+  marketInfos: any[];
+  swapMode: string;
+}
+
+export interface QuickNodeMetisTransaction {
+  transaction: string;
+  lastValidBlockHeight?: number;
+  signers?: string[];
+}
